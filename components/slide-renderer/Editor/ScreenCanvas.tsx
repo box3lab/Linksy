@@ -61,12 +61,8 @@ export function ScreenCanvas() {
   return (
     <div className="relative h-full w-full overflow-hidden select-none" ref={canvasRef}>
       <div
-        className="absolute rounded-lg overflow-hidden transition-transform duration-700"
+        className="absolute inset-0 rounded-lg overflow-hidden transition-transform duration-700"
         style={{
-          width: `${viewportStyles.width * canvasScale}px`,
-          height: `${viewportStyles.height * canvasScale}px`,
-          left: `${viewportStyles.left}px`,
-          top: `${viewportStyles.top}px`,
           ...(zoomTarget && zoomGeometry
             ? {
                 transform: `scale(${zoomTarget.scale})`,
@@ -83,11 +79,11 @@ export function ScreenCanvas() {
 
         {/* Content layer - scaled */}
         <div
-          className="absolute top-0 left-0 origin-top-left"
+          className="absolute top-0 left-1/2 origin-top"
           style={{
             width: `${viewportStyles.width}px`,
             height: `${viewportStyles.height}px`,
-            transform: `scale(${canvasScale})`,
+            transform: `translateX(-50%) scale(${canvasScale})`,
           }}
         >
           {elements.map((element, index) => (
