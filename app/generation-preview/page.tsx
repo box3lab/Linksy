@@ -751,8 +751,9 @@ function GenerationPreviewContent() {
   // Still loading session from sessionStorage
   if (!sessionLoaded) {
     return (
-      <div className="min-h-[100dvh] w-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">
-        <div className="text-center text-muted-foreground">
+      <div className="relative min-h-[100dvh] w-full flex items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 -z-10 bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat pointer-events-none" />
+        <div className="text-center text-sky-600">
           <div className="size-8 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
         </div>
       </div>
@@ -762,13 +763,19 @@ function GenerationPreviewContent() {
   // No session found
   if (!session) {
     return (
-      <div className="min-h-[100dvh] w-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">
-        <Card className="p-8 max-w-md w-full">
+      <div className="relative min-h-[100dvh] w-full flex items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 -z-10 bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat pointer-events-none" />
+        <Card className="p-8 max-w-md w-full rounded-3xl border-2 border-sky-200 bg-white/92 backdrop-blur-sm">
           <div className="text-center space-y-4">
-            <AlertCircle className="size-12 text-muted-foreground mx-auto" />
-            <h2 className="text-xl font-semibold">{t('generation.sessionNotFound')}</h2>
-            <p className="text-sm text-muted-foreground">{t('generation.sessionNotFoundDesc')}</p>
-            <Button onClick={() => router.push('/')} className="w-full">
+            <AlertCircle className="size-12 text-sky-500 mx-auto" />
+            <h2 className="text-xl font-semibold text-slate-800">
+              {t('generation.sessionNotFound')}
+            </h2>
+            <p className="text-sm text-slate-500">{t('generation.sessionNotFoundDesc')}</p>
+            <Button
+              onClick={() => router.push('/')}
+              className="w-full rounded-full border-2 border-orange-300 bg-orange-400 text-white hover:bg-orange-500"
+            >
               <ArrowLeft className="size-4 mr-2" />
               {t('generation.backToHome')}
             </Button>
@@ -784,15 +791,16 @@ function GenerationPreviewContent() {
       : ALL_STEPS[0];
 
   return (
-    <div className="min-h-[100dvh] w-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden text-center">
+    <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 text-center overflow-hidden">
+      <div className="fixed inset-0 -z-10 bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat pointer-events-none" />
       {/* Background Decor */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"
+          className="absolute top-0 left-1/4 w-80 h-80 bg-sky-200/35 rounded-full blur-3xl animate-pulse"
           style={{ animationDuration: '4s' }}
         />
         <div
-          className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"
+          className="absolute bottom-0 right-1/4 w-80 h-80 bg-orange-200/30 rounded-full blur-3xl animate-pulse"
           style={{ animationDuration: '6s' }}
         />
       </div>
@@ -803,7 +811,12 @@ function GenerationPreviewContent() {
         animate={{ opacity: 1, y: 0 }}
         className="absolute top-4 left-4 z-20"
       >
-        <Button variant="ghost" size="sm" onClick={goBackToHome}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={goBackToHome}
+          className="rounded-full border border-sky-200 bg-white/90 text-sky-700 hover:bg-sky-50"
+        >
           <ArrowLeft className="size-4 mr-2" />
           {t('generation.backToHome')}
         </Button>
@@ -816,7 +829,7 @@ function GenerationPreviewContent() {
           transition={{ duration: 0.5 }}
           className="w-full"
         >
-          <Card className="relative overflow-hidden border-muted/40 shadow-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl min-h-[400px] flex flex-col items-center justify-center p-8 md:p-12">
+          <Card className="relative overflow-hidden rounded-[34px] border-2 border-sky-200/90 bg-white/90 backdrop-blur-sm min-h-[400px] flex flex-col items-center justify-center p-8 md:p-12">
             {/* Progress Dots */}
             <div className="absolute top-6 left-0 right-0 flex justify-center gap-2">
               {activeSteps.map((step, idx) => (
@@ -825,10 +838,10 @@ function GenerationPreviewContent() {
                   className={cn(
                     'h-1.5 rounded-full transition-all duration-500',
                     idx < currentStepIndex
-                      ? 'w-1.5 bg-blue-500/30'
+                      ? 'w-1.5 bg-sky-300'
                       : idx === currentStepIndex
-                        ? 'w-8 bg-blue-500'
-                        : 'w-1.5 bg-muted/50',
+                        ? 'w-8 bg-sky-500'
+                        : 'w-1.5 bg-sky-100',
                   )}
                 />
               ))}
@@ -844,18 +857,18 @@ function GenerationPreviewContent() {
                       key="error"
                       initial={{ scale: 0.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="size-32 rounded-full bg-red-500/10 flex items-center justify-center border-2 border-red-500/20"
+                      className="size-32 rounded-full bg-orange-100/70 flex items-center justify-center border-2 border-orange-300"
                     >
-                      <AlertCircle className="size-16 text-red-500" />
+                      <AlertCircle className="size-16 text-orange-500" />
                     </motion.div>
                   ) : isComplete ? (
                     <motion.div
                       key="complete"
                       initial={{ scale: 0.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="size-32 rounded-full bg-green-500/10 flex items-center justify-center border-2 border-green-500/20"
+                      className="size-32 rounded-full bg-sky-100/70 flex items-center justify-center border-2 border-sky-300"
                     >
-                      <CheckCircle2 className="size-16 text-green-500" />
+                      <CheckCircle2 className="size-16 text-sky-500" />
                     </motion.div>
                   ) : (
                     <motion.div
@@ -886,14 +899,14 @@ function GenerationPreviewContent() {
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-2"
                   >
-                    <h2 className="text-2xl font-bold tracking-tight">
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-800">
                       {error
                         ? t('generation.generationFailed')
                         : isComplete
                           ? t('generation.generationComplete')
                           : t(activeStep.title)}
                     </h2>
-                    <p className="text-muted-foreground text-base">
+                    <p className="text-slate-500 text-base">
                       {error
                         ? error
                         : isComplete
@@ -921,29 +934,13 @@ function GenerationPreviewContent() {
                         <TooltipTrigger asChild>
                           <motion.button
                             type="button"
-                            animate={{
-                              boxShadow: [
-                                '0 0 0 0 rgba(251, 191, 36, 0), 0 0 0 0 rgba(251, 191, 36, 0)',
-                                '0 0 16px 4px rgba(251, 191, 36, 0.12), 0 0 4px 1px rgba(251, 191, 36, 0.08)',
-                                '0 0 0 0 rgba(251, 191, 36, 0), 0 0 0 0 rgba(251, 191, 36, 0)',
-                              ],
-                            }}
-                            transition={{
-                              duration: 3,
-                              repeat: Infinity,
-                              ease: 'easeInOut',
-                            }}
                             className="relative size-7 rounded-full flex items-center justify-center cursor-default
-                                       bg-gradient-to-br from-amber-400/15 to-orange-400/10
-                                       border border-amber-400/25 hover:border-amber-400/40
-                                       hover:from-amber-400/20 hover:to-orange-400/15
+                                       bg-orange-100/80
+                                       border border-orange-300/90 hover:border-orange-400
                                        transition-colors duration-300
-                                       focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/30"
+                                       focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
                           >
-                            <AlertTriangle
-                              className="size-3.5 text-amber-500 dark:text-amber-400"
-                              strokeWidth={2.5}
-                            />
+                            <AlertTriangle className="size-3.5 text-orange-500" strokeWidth={2.5} />
                           </motion.button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" sideOffset={6}>
@@ -973,7 +970,12 @@ function GenerationPreviewContent() {
                 animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-xs"
               >
-                <Button size="lg" variant="outline" className="w-full h-12" onClick={goBackToHome}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-12 rounded-full border-2 border-sky-300 bg-white text-sky-700 hover:bg-sky-50"
+                  onClick={goBackToHome}
+                >
                   {t('generation.goBackAndRetry')}
                 </Button>
               </motion.div>
@@ -981,14 +983,14 @@ function GenerationPreviewContent() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex items-center gap-3 text-sm text-muted-foreground/50 font-medium uppercase tracking-widest"
+                className="flex items-center gap-3 text-sm text-slate-500 font-medium uppercase tracking-widest"
               >
-                <Sparkles className="size-3 animate-pulse" />
+                <Sparkles className="size-3 animate-pulse text-orange-500" />
                 {t('generation.aiWorking')}
                 {generatedAgents.length > 0 && !showAgentReveal && (
                   <button
                     onClick={() => setShowAgentReveal(true)}
-                    className="ml-2 flex items-center gap-1.5 rounded-full border border-purple-300/30 bg-purple-500/10 px-3 py-1 text-xs font-medium normal-case tracking-normal text-purple-400 transition-colors hover:bg-purple-500/20 hover:text-purple-300"
+                    className="ml-2 flex items-center gap-1.5 rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-xs font-medium normal-case tracking-normal text-sky-700 transition-colors hover:bg-sky-200"
                   >
                     <Bot className="size-3" />
                     {t('generation.viewAgents')}
@@ -1018,10 +1020,11 @@ export default function GenerationPreviewPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-[100dvh] w-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-center justify-center">
+        <div className="relative min-h-[100dvh] w-full flex items-center justify-center overflow-hidden">
+          <div className="fixed inset-0 -z-10 bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat pointer-events-none" />
           <div className="animate-pulse space-y-4 text-center">
-            <div className="h-8 w-48 bg-muted rounded mx-auto" />
-            <div className="h-4 w-64 bg-muted rounded mx-auto" />
+            <div className="h-8 w-48 bg-sky-100 rounded mx-auto" />
+            <div className="h-4 w-64 bg-sky-100 rounded mx-auto" />
           </div>
         </div>
       }

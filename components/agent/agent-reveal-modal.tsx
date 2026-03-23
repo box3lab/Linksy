@@ -106,16 +106,21 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-zinc-100/90 backdrop-blur-sm dark:bg-black/70 dark:backdrop-blur-md"
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white/70 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
         >
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -top-16 left-1/4 h-56 w-56 rounded-full bg-sky-200/35 blur-3xl" />
+            <div className="absolute -bottom-12 right-1/4 h-56 w-56 rounded-full bg-orange-200/35 blur-3xl" />
+          </div>
+
           {/* Close button */}
           {allRevealed && (
             <motion.button
-              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full bg-black/5 text-zinc-500 backdrop-blur-sm transition-colors hover:bg-black/10 hover:text-zinc-700 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20 dark:hover:text-white"
+              className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full border border-sky-200 bg-white/90 text-sky-600 transition-colors hover:bg-sky-50 hover:text-sky-700"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.2 }}
@@ -127,12 +132,12 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
 
           {/* Title */}
           <motion.h2
-            className="mb-8 text-2xl font-bold text-zinc-800 drop-shadow-sm dark:text-white dark:drop-shadow-lg md:text-3xl"
+            className="mb-8 text-2xl font-bold text-slate-800 md:text-3xl"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.4 }}
           >
-            <Sparkles className="mr-2 inline-block size-6 text-amber-500 dark:text-yellow-400" />
+            <Sparkles className="mr-2 inline-block size-6 text-orange-500" />
             {t('generation.agentRevealTitle')}
           </motion.h2>
 
@@ -172,7 +177,7 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
                         }}
                       >
                         {/* Inner card body */}
-                        <div className="relative flex size-full flex-col overflow-clip rounded-[14px] bg-white dark:bg-zinc-900">
+                        <div className="relative flex size-full flex-col overflow-clip rounded-[14px] bg-white">
                           {/* Top gradient band with texture */}
                           <div className="relative shrink-0 overflow-hidden" style={{ height: 56 }}>
                             {/* Color gradient fill */}
@@ -224,7 +229,7 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
                           {/* Avatar — overlapping the band */}
                           <div className="relative z-10 -mt-7 flex justify-center">
                             <div
-                              className="flex size-[50px] items-center justify-center rounded-full border-[2.5px] shadow-lg shadow-black/40"
+                              className="flex size-[50px] items-center justify-center rounded-full border-[2.5px]"
                               style={{
                                 borderColor: agent.color,
                                 backgroundColor: '#f8f8fc',
@@ -286,7 +291,7 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
 
                           {/* Persona text — fills remaining space */}
                           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3.5 pt-1.5 pb-3">
-                            <p className="text-left text-[10.5px] leading-[1.65] text-zinc-600 dark:text-zinc-400">
+                            <p className="text-left text-[10.5px] leading-[1.65] text-zinc-600">
                               {agent.persona}
                             </p>
                           </div>
@@ -310,50 +315,31 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
                         transform: 'rotateY(180deg)',
                       }}
                     >
-                      {/* Gradient border matching front style */}
                       <div
                         className="absolute inset-0 rounded-2xl p-[2px]"
                         style={{
-                          background: 'linear-gradient(160deg, #6366f1, #a855f7, #6366f1)',
+                          background: 'linear-gradient(150deg, #7dd3fc, #fdba74, #7dd3fc)',
                         }}
                       >
                         <div
                           className="relative flex size-full flex-col items-center justify-center rounded-[14px]"
                           style={{
                             background:
-                              'linear-gradient(145deg, #1e1b4b 0%, #312e81 40%, #1e1b4b 100%)',
+                              'linear-gradient(165deg, #ecfeff 0%, #f0f9ff 45%, #ffedd5 100%)',
                           }}
                         >
-                          {/* Decorative inner border */}
-                          <div className="absolute inset-3 rounded-xl border border-white/[0.08]" />
-                          {/* Diamond pattern corners */}
-                          <svg
-                            className="absolute left-3 top-3 size-5 text-white/[0.07]"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M10 0 L20 10 L10 20 L0 10 Z" fill="currentColor" />
-                          </svg>
-                          <svg
-                            className="absolute right-3 top-3 size-5 text-white/[0.07]"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M10 0 L20 10 L10 20 L0 10 Z" fill="currentColor" />
-                          </svg>
-                          <svg
-                            className="absolute bottom-3 left-3 size-5 text-white/[0.07]"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M10 0 L20 10 L10 20 L0 10 Z" fill="currentColor" />
-                          </svg>
-                          <svg
-                            className="absolute bottom-3 right-3 size-5 text-white/[0.07]"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M10 0 L20 10 L10 20 L0 10 Z" fill="currentColor" />
-                          </svg>
-                          {/* Center icon */}
-                          <Sparkles className="size-9 text-purple-300/70" />
-                          <span className="mt-1.5 text-xl font-bold text-purple-200/60">?</span>
+                          <div className="absolute inset-3 rounded-xl border border-sky-200/70" />
+
+                          <div className="absolute left-4 top-4 h-4 w-4 rounded-full bg-sky-200/70" />
+                          <div className="absolute right-5 top-6 h-3 w-3 rounded-full bg-orange-200/80" />
+                          <div className="absolute bottom-5 left-6 h-3.5 w-3.5 rounded-full bg-yellow-200/80" />
+                          <div className="absolute bottom-4 right-5 h-4 w-4 rounded-full bg-sky-100" />
+
+                          <Sparkles className="size-9 text-sky-500/80" />
+                          <span className="mt-1.5 text-xl font-bold text-orange-500/80">?</span>
+                          <span className="mt-1 text-[10px] font-medium text-slate-500">
+                            ready to reveal
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -376,9 +362,7 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
                   key={index}
                   className={cn(
                     'size-2 rounded-full transition-colors duration-300',
-                    index < revealedCount
-                      ? 'bg-zinc-700 dark:bg-white'
-                      : 'bg-zinc-300 dark:bg-white/30',
+                    index < revealedCount ? 'bg-sky-500' : 'bg-sky-200',
                   )}
                 />
               ))}
@@ -386,7 +370,7 @@ export function AgentRevealModal({ agents, open, onClose, onAllRevealed }: Agent
 
             {allRevealed && (
               <motion.button
-                className="rounded-full bg-zinc-800 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-white/15 dark:hover:bg-white/25"
+                className="rounded-full border-2 border-orange-300 bg-orange-400 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-500"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.3 }}
