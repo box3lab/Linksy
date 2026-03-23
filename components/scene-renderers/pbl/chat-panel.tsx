@@ -105,8 +105,8 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <div className="border-t p-3">
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2">
+      <div className="border-t border-sky-100 p-3 bg-white/70">
+        <div className="flex items-center gap-2 text-[10px] text-slate-400 mb-2 px-1">
           <span>{t('pbl.chat.mentionHint')}</span>
         </div>
         <div className="flex gap-2 items-center">
@@ -124,7 +124,7 @@ export function ChatPanel({
             placeholder={t('pbl.chat.placeholder')}
             disabled={isLoading}
             rows={1}
-            className="flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            className="flex-1 resize-none rounded-2xl border-2 border-sky-200/70 bg-white/90 px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none disabled:opacity-50"
           />
           <SpeechButton
             size="md"
@@ -140,7 +140,7 @@ export function ChatPanel({
           <button
             onClick={handleSubmit}
             disabled={!input.trim() || isLoading}
-            className="shrink-0 h-8 w-8 rounded-lg flex items-center justify-center transition-colors bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center transition-colors bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50"
           >
             <ArrowUp className="w-4 h-4" />
           </button>
