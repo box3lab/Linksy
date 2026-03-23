@@ -84,7 +84,7 @@ export function AgentBar() {
     <div className="flex items-center gap-1.5 shrink-0">
       {/* Teacher avatar — always shown */}
       {teacherAgent && (
-        <div className="size-8 rounded-full overflow-hidden ring-2 ring-blue-400/40 dark:ring-blue-500/30 shrink-0">
+        <div className="size-8 rounded-full overflow-hidden ring-2 ring-sky-300/80 shrink-0">
           <img
             src={teacherAgent.avatar}
             alt={getAgentName(teacherAgent)}
@@ -107,7 +107,7 @@ export function AgentBar() {
               </div>
             )}
           </div>
-          <Shuffle className="size-4 text-violet-400 dark:text-violet-500" />
+          <Shuffle className="size-4 text-orange-500" />
         </>
       ) : (
         <>
@@ -147,13 +147,13 @@ export function AgentBar() {
         <TooltipTrigger asChild>
           <button
             className={cn(
-              'group flex items-center gap-2 cursor-pointer rounded-full px-2.5 py-2 transition-all w-full',
-              'border border-border/50 text-muted-foreground/70 hover:text-foreground hover:bg-muted/60',
+              'group flex items-center gap-2 cursor-pointer rounded-full px-2.5 py-2 transition-colors w-full',
+              'border-2 border-sky-200/80 bg-white/90 text-slate-700 hover:border-sky-300 hover:bg-sky-50',
             )}
             onClick={() => setOpen(!open)}
           >
             {/* Left side — text changes based on open/close */}
-            <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors hidden sm:block font-medium flex-1 text-left">
+            <span className="text-xs text-sky-600/90 group-hover:text-sky-700 transition-colors hidden sm:block font-medium flex-1 text-left">
               {open ? t('agentBar.expandedTitle') : t('agentBar.readyToLearn')}
             </span>
 
@@ -162,9 +162,9 @@ export function AgentBar() {
 
             {/* Chevron */}
             {open ? (
-              <ChevronUp className="size-3 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors" />
+              <ChevronUp className="size-3 text-sky-500 group-hover:text-sky-600 transition-colors" />
             ) : (
-              <ChevronDown className="size-3 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors" />
+              <ChevronDown className="size-3 text-sky-500 group-hover:text-sky-600 transition-colors" />
             )}
           </button>
         </TooltipTrigger>
@@ -185,16 +185,16 @@ export function AgentBar() {
             transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             className="absolute right-0 top-full mt-1 z-50 w-80"
           >
-            <div className="rounded-2xl bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06] shadow-[0_1px_8px_-2px_rgba(0,0,0,0.06)] dark:shadow-[0_1px_8px_-2px_rgba(0,0,0,0.3)] px-2.5 py-2">
+            <div className="rounded-2xl bg-white/96 backdrop-blur-sm border-2 border-sky-200/80 px-2.5 py-2">
               {/* Mode tabs — full width, 50/50 */}
-              <div className="flex rounded-lg border bg-muted/30 p-0.5 mb-2.5">
+              <div className="flex rounded-lg border border-sky-200 bg-sky-50/70 p-0.5 mb-2.5">
                 <button
                   onClick={() => handleModeChange('preset')}
                   className={cn(
                     'flex-1 py-1.5 text-xs font-medium rounded-md transition-all text-center',
                     agentMode === 'preset'
-                      ? 'bg-background shadow-sm text-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
+                      ? 'bg-white text-slate-800 border border-sky-200'
+                      : 'text-slate-500 hover:text-slate-700',
                   )}
                 >
                   {t('settings.agentModePreset')}
@@ -204,11 +204,11 @@ export function AgentBar() {
                   className={cn(
                     'flex-1 py-1.5 text-xs font-medium rounded-md transition-all text-center flex items-center justify-center gap-1',
                     agentMode === 'auto'
-                      ? 'bg-background shadow-sm text-foreground'
-                      : 'text-muted-foreground hover:text-foreground',
+                      ? 'bg-white text-slate-800 border border-sky-200'
+                      : 'text-slate-500 hover:text-slate-700',
                   )}
                 >
-                  <Sparkles className="h-3 w-3" />
+                  <Sparkles className="h-3 w-3 text-orange-500" />
                   {t('settings.agentModeAuto')}
                 </button>
               </div>
@@ -226,15 +226,15 @@ export function AgentBar() {
                           onClick={() => toggleAgent(agent.id)}
                           className={cn(
                             'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors cursor-pointer rounded-lg',
-                            isSelected ? 'bg-primary/5' : 'hover:bg-muted/50',
+                            isSelected ? 'bg-sky-100/80' : 'hover:bg-sky-50/60',
                           )}
                         >
                           <Checkbox checked={isSelected} className="pointer-events-none" />
                           <div
-                            className="size-8 rounded-full overflow-hidden shrink-0 ring-1 ring-border/40"
-                            style={{
-                              boxShadow: isSelected ? `0 0 0 2px ${agent.color}30` : undefined,
-                            }}
+                            className={cn(
+                              'size-8 rounded-full overflow-hidden shrink-0 ring-1',
+                              isSelected ? 'ring-sky-300' : 'ring-slate-200',
+                            )}
                           >
                             <img
                               src={agent.avatar}
@@ -266,33 +266,25 @@ export function AgentBar() {
               ) : (
                 /* Auto-generate mode */
                 <div className="flex flex-col items-center pt-6 pb-2 gap-8">
-                  {/* Shuffle icon with ambient animation */}
-                  <div className="relative flex items-center justify-center">
-                    {/* Ping ripple */}
-                    <div className="absolute size-12 rounded-full bg-violet-400/10 dark:bg-violet-400/15 animate-ping [animation-duration:3s]" />
-                    {/* Soft glow ring */}
-                    <div className="absolute size-14 rounded-full bg-violet-400/5 dark:bg-violet-400/10 animate-pulse [animation-duration:2.5s]" />
-                    {/* Icon */}
-                    <Shuffle className="relative size-7 text-violet-400 dark:text-violet-500" />
+                  <div className="size-14 rounded-full bg-sky-100 flex items-center justify-center border border-sky-200">
+                    <Shuffle className="size-7 text-orange-500" />
                   </div>
-                  <p className="text-xs text-muted-foreground text-center">
+                  <p className="text-xs text-slate-500 text-center">
                     {t('settings.agentModeAutoDesc')}
                   </p>
                 </div>
               )}
 
               {/* Max turns — always visible */}
-              <div className="pt-2.5 mt-2.5 border-t flex items-center gap-3">
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {t('settings.maxTurns')}
-                </span>
+              <div className="pt-2.5 mt-2.5 border-t border-sky-100 flex items-center gap-3">
+                <span className="text-xs text-slate-500 shrink-0">{t('settings.maxTurns')}</span>
                 <Input
                   type="number"
                   min="1"
                   max="20"
                   value={maxTurns}
                   onChange={(e) => setMaxTurns(e.target.value)}
-                  className="w-16 h-7 text-xs"
+                  className="w-16 h-7 text-xs border-sky-200"
                 />
               </div>
             </div>
