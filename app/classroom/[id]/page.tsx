@@ -151,24 +151,25 @@ export default function ClassroomDetailPage() {
   return (
     <ThemeProvider>
       <MediaStageProvider value={classroomId}>
-        <div className="h-screen flex flex-col overflow-hidden">
+        <div className="relative h-screen flex flex-col overflow-hidden">
+          <div className="fixed inset-0 -z-10 bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat pointer-events-none" />
           {loading ? (
-            <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-              <div className="text-center text-muted-foreground">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="rounded-2xl border-2 border-sky-200 bg-white/90 px-6 py-4 text-center text-sky-700">
                 <p>Loading classroom...</p>
               </div>
             </div>
           ) : error ? (
-            <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-              <div className="text-center">
-                <p className="text-destructive mb-4">Error: {error}</p>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center rounded-2xl border-2 border-orange-200 bg-white/92 px-6 py-5">
+                <p className="text-orange-600 mb-4">Error: {error}</p>
                 <button
                   onClick={() => {
                     setError(null);
                     setLoading(true);
                     loadClassroom();
                   }}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                  className="px-4 py-2 rounded-full border-2 border-orange-300 bg-orange-400 text-white hover:bg-orange-500"
                 >
                   Retry
                 </button>

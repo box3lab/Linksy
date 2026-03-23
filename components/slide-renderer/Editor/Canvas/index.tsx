@@ -248,7 +248,7 @@ export function Canvas(_props: CanvasProps) {
 
           {/* Viewport wrapper */}
           <div
-            className="viewport-wrapper absolute shadow-[0_0_0_1px_rgba(0,0,0,0.01),0_0_12px_0_rgba(0,0,0,0.1)]"
+            className="viewport-wrapper absolute"
             style={{
               width: `${viewportStyles.width * canvasScale}px`,
               height: `${viewportStyles.height * canvasScale}px`,

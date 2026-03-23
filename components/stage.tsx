@@ -677,7 +677,7 @@ export function Stage({
   })();
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex-1 flex overflow-hidden bg-sky-50/30">
       {/* Scene Sidebar */}
       <SceneSidebar
         collapsed={sidebarCollapsed}
@@ -899,7 +899,7 @@ export function Stage({
           if (!open) cancelSceneSwitch();
         }}
       >
-        <AlertDialogContent className="max-w-sm rounded-2xl p-0 overflow-hidden border-0 shadow-[0_25px_60px_-12px_rgba(0,0,0,0.15)] dark:shadow-[0_25px_60px_-12px_rgba(0,0,0,0.5)]">
+        <AlertDialogContent className="max-w-sm rounded-2xl p-0 overflow-hidden border border-sky-200 bg-white">
           <VisuallyHidden.Root>
             <AlertDialogTitle>{t('stage.confirmSwitchTitle')}</AlertDialogTitle>
           </VisuallyHidden.Root>
@@ -908,15 +908,15 @@ export function Stage({
 
           <div className="px-6 pt-5 pb-2 flex flex-col items-center text-center">
             {/* Icon */}
-            <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center mb-4 ring-1 ring-amber-200/50 dark:ring-amber-700/30">
-              <AlertTriangle className="w-6 h-6 text-amber-500 dark:text-amber-400" />
+            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mb-4 ring-1 ring-amber-200/50">
+              <AlertTriangle className="w-6 h-6 text-amber-500" />
             </div>
             {/* Title */}
-            <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 mb-1.5">
+            <h3 className="text-base font-bold text-slate-800 mb-1.5">
               {t('stage.confirmSwitchTitle')}
             </h3>
             {/* Description */}
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            <p className="text-sm text-slate-500 leading-relaxed">
               {t('stage.confirmSwitchMessage')}
             </p>
           </div>
@@ -927,7 +927,7 @@ export function Stage({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmSceneSwitch}
-              className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0 shadow-md shadow-amber-200/50 dark:shadow-amber-900/30"
+              className="flex-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0"
             >
               {t('common.confirm')}
             </AlertDialogAction>

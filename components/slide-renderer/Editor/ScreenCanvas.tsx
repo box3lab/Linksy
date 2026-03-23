@@ -61,7 +61,7 @@ export function ScreenCanvas() {
   return (
     <div className="relative h-full w-full overflow-hidden select-none" ref={canvasRef}>
       <div
-        className="absolute shadow-[0_0_0_1px_rgba(0,0,0,0.01),0_0_12px_0_rgba(0,0,0,0.1)] rounded-lg overflow-hidden transition-transform duration-700"
+        className="absolute rounded-lg overflow-hidden transition-transform duration-700"
         style={{
           width: `${viewportStyles.width * canvasScale}px`,
           height: `${viewportStyles.height * canvasScale}px`,
