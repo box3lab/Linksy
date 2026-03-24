@@ -44,6 +44,12 @@ import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDraftCache } from '@/lib/hooks/use-draft-cache';
 import { SpeechButton } from '@/components/audio/speech-button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const log = createLogger('Home');
 
@@ -351,6 +357,11 @@ function HomePage() {
         locale={locale}
         onStartNew={handleNewConversation}
         onOpenClassroom={(id) => router.push(`/classroom/${id}`)}
+        onDeleteClassroom={async (id) => {
+          const confirmed = window.confirm(`${t('classroom.deleteConfirmTitle')}?`);
+          if (!confirmed) return;
+          await confirmDelete(id);
+        }}
       />
 
       <div className="relative min-h-[100dvh] w-full flex flex-col items-center p-4 pt-16 md:p-8 md:pt-16 lg:pl-[296px]">
@@ -565,12 +576,15 @@ function HomeSidebar({
   locale,
   onStartNew,
   onOpenClassroom,
+  onDeleteClassroom,
 }: {
   sections: Array<{ key: string; label: string; items: StageListItem[] }>;
   locale: 'zh-CN' | 'en-US';
   onStartNew: () => void;
   onOpenClassroom: (id: string) => void;
+  onDeleteClassroom: (id: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-[268px] rounded-none bg-sky-200/70 border-r-[3px] border-r-slate-900/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] flex-col overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b-2 border-slate-900/70">
@@ -584,10 +598,8 @@ function HomeSidebar({
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-hide">
         {sections.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-slate-900/50 bg-white/85 p-3 text-[12px] leading-relaxed text-slate-700">
-            {locale === 'zh-CN'
-              ? '还没有课堂记录，点击上方按钮开始创建吧。'
-              : 'No classroom history yet. Start a new class above.'}
+          <div className="text-[12px] leading-relaxed text-slate-700">
+            {locale === 'zh-CN' ? '还没有课堂记录。' : 'No classroom history yet.'}
           </div>
         ) : (
           sections.map((section) => (
@@ -597,9 +609,17 @@ function HomeSidebar({
               </p>
               <div className="space-y-1">
                 {section.items.map((item, index) => (
-                  <button
+                  <div
                     key={item.id}
                     onClick={() => onOpenClassroom(item.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onOpenClassroom(item.id);
+                      }
+                    }}
                     className={cn(
                       'group/item w-full rounded-[16px] border-2 border-slate-900/75 px-2.5 py-2 text-left transition-colors shadow-[0_2px_0_rgba(15,23,42,0.25)]',
                       index % 2 === 0 ? 'bg-white/95' : 'bg-sky-50/85',
@@ -610,9 +630,36 @@ function HomeSidebar({
                       <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-800 group-hover/item:text-slate-900">
                         {item.name}
                       </span>
-                      <MoreHorizontal className="size-3.5 text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="size-6 rounded-full flex items-center justify-center text-slate-400 opacity-100 transition-opacity hover:bg-white"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="size-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          sideOffset={6}
+                          className="min-w-24"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <DropdownMenuItem
+                            data-variant="destructive"
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              onDeleteClassroom(item.id);
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                            {t('classroom.delete')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>

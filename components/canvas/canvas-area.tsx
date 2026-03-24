@@ -82,7 +82,7 @@ export function CanvasArea({
       {/* Slide area — takes remaining space */}
       <div
         className={cn(
-          'flex-1 min-h-0 relative overflow-hidden flex items-center justify-center p-3 transition-colors duration-500',
+          'flex-1 min-h-0 w-full relative overflow-hidden flex items-center justify-center p-[clamp(12px,3vw,40px)] transition-colors duration-500',
         )}
       >
         <div
