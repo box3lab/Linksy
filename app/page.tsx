@@ -456,9 +456,9 @@ function HomePage() {
             src="/logo.png"
             alt="Linksy"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.05, duration: 0.2 }}
-            className="h-10 md:h-12 mb-2"
+            animate={{ opacity: 1, scale: 1.7 }}
+            transition={{ delay: 0.05, duration: 0.1 }}
+            className="h-10 md:h-12 mb-4"
           />
 
           {/* ── Slogan ── */}
