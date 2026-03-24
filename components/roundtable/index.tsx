@@ -6,13 +6,7 @@ import { cn } from '@/lib/utils';
 import { useAudioRecorder } from '@/lib/hooks/use-audio-recorder';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { toast } from 'sonner';
-import { useSettingsStore, PLAYBACK_SPEEDS } from '@/lib/store/settings';
-import { ProactiveCard } from '@/components/chat/proactive-card';
-import { PresentationSpeechOverlay } from '@/components/roundtable/presentation-speech-overlay';
-import { AvatarDisplay } from '@/components/ui/avatar-display';
-import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
-import { useAgentRegistry } from '@/lib/orchestration/registry/store';
-import { DEFAULT_TEACHER_AVATAR, DEFAULT_USER_AVATAR } from '@/components/roundtable/constants';
+import { useSettingsStore } from '@/lib/store/settings';
 import type { DiscussionAction } from '@/lib/types/action';
 import type { EngineMode, PlaybackView } from '@/lib/playback';
 import type { Participant } from '@/lib/types/roundtable';
@@ -64,73 +58,49 @@ interface RoundtableProps {
   readonly onPrevSlide?: () => void;
   readonly onNextSlide?: () => void;
   readonly onWhiteboardClose?: () => void;
-  readonly isPresenting?: boolean;
-  readonly controlsVisible?: boolean;
-  readonly onTogglePresentation?: () => void;
-  readonly onPresentationInteractionChange?: (active: boolean) => void;
-  /** Ref to the fullscreen container — passed to ProactiveCard so its portal
-   *  renders inside the top-layer during presentation mode. */
-  readonly fullscreenContainerRef?: React.RefObject<HTMLDivElement | null>;
-}
-
-const VOICE_WAVE_BARS = [
-  { peak: 18, duration: 0.55 },
-  { peak: 24, duration: 0.72 },
-  { peak: 15, duration: 0.63 },
-  { peak: 22, duration: 0.68 },
-  { peak: 27, duration: 0.78 },
-  { peak: 19, duration: 0.61 },
-  { peak: 26, duration: 0.74 },
-  { peak: 17, duration: 0.58 },
-  { peak: 23, duration: 0.7 },
-  { peak: 16, duration: 0.57 },
-  { peak: 21, duration: 0.66 },
-  { peak: 14, duration: 0.53 },
-] as const;
-
-function VoiceWaveformBars({ barClassName }: { readonly barClassName: string }) {
-  return VOICE_WAVE_BARS.map((bar, i) => (
-    <motion.div
-      key={i}
-      animate={{
-        height: [4, bar.peak, 4],
-        opacity: [0.3, 1, 0.3],
-      }}
-      transition={{
-        repeat: Infinity,
-        duration: bar.duration,
-        delay: i * 0.05,
-        ease: 'easeInOut',
-      }}
-      className={cn('w-1 rounded-full', barClassName)}
-    />
-  ));
 }
 
 export function Roundtable({
   onMessageSend,
   onInputActivate,
-
-  onResumeTopic,
-  onPlayPause,
-  isDiscussionPaused,
-  onDiscussionPause,
-  onDiscussionResume,
-  currentSceneIndex = 0,
-  scenesCount = 1,
-  whiteboardOpen = false,
-  sidebarCollapsed,
-  chatCollapsed,
-  onToggleSidebar,
-  onToggleChat,
-  onPrevSlide,
-  onNextSlide,
-  onWhiteboardClose,
-  isPresenting,
-  controlsVisible,
-  onTogglePresentation,
-  onPresentationInteractionChange,
-  fullscreenContainerRef,
+  mode: _mode,
+  initialParticipants: _initialParticipants,
+  playbackView: _playbackView,
+  currentSpeech: _currentSpeech,
+  lectureSpeech: _lectureSpeech,
+  idleText: _idleText,
+  playbackCompleted: _playbackCompleted,
+  discussionRequest: _discussionRequest,
+  engineMode: _engineMode,
+  isStreaming: _isStreaming,
+  sessionType: _sessionType,
+  speakingAgentId: _speakingAgentId,
+  speechProgress: _speechProgress,
+  showEndFlash: _showEndFlash,
+  endFlashSessionType: _endFlashSessionType,
+  thinkingState: _thinkingState,
+  isCueUser: _isCueUser,
+  isTopicPending: _isTopicPending,
+  onDiscussionStart: _onDiscussionStart,
+  onDiscussionSkip: _onDiscussionSkip,
+  onStopDiscussion: _onStopDiscussion,
+  onResumeTopic: _onResumeTopic,
+  onPlayPause: _onPlayPause,
+  isDiscussionPaused: _isDiscussionPaused,
+  onDiscussionPause: _onDiscussionPause,
+  onDiscussionResume: _onDiscussionResume,
+  totalActions: _totalActions,
+  currentActionIndex: _currentActionIndex,
+  currentSceneIndex: _currentSceneIndex,
+  scenesCount: _scenesCount,
+  whiteboardOpen: _whiteboardOpen,
+  sidebarCollapsed: _sidebarCollapsed,
+  chatCollapsed: _chatCollapsed,
+  onToggleSidebar: _onToggleSidebar,
+  onToggleChat: _onToggleChat,
+  onPrevSlide: _onPrevSlide,
+  onNextSlide: _onNextSlide,
+  onWhiteboardClose: _onWhiteboardClose,
 }: RoundtableProps) {
   const { t } = useI18n();
   const asrEnabled = useSettingsStore((state) => state.asrEnabled);
@@ -142,241 +112,56 @@ export function Roundtable({
   const setPlaybackSpeed = useSettingsStore((s) => s.setPlaybackSpeed);
   const [isInputOpen, setIsInputOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const [userMessage, setUserMessage] = useState<string | null>(null);
-  const agentScrollRef = useRef<HTMLDivElement>(null);
-  const bubbleScrollRef = useRef<HTMLDivElement>(null);
-  const teacherAvatarRef = useRef<HTMLDivElement>(null);
-  const studentAvatarRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const userMessageClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // End flash visible state (Issue 3)
-  const [endFlashVisible, setEndFlashVisible] = useState(false);
-
-  // Send cooldown: lock input from "message sent" until "agent bubble appears"
   const [isSendCooldown, setIsSendCooldown] = useState(false);
   const isSendCooldownRef = useRef(false);
 
-  const teacherParticipant = initialParticipants.find((p) => p.role === 'teacher');
-  const studentParticipants = initialParticipants.filter(
-    (p) => p.role !== 'teacher' && p.role !== 'user',
-  );
-
-  // Stable ref object for the current discussion agent's avatar
-  const discussionAnchorRef = useRef<HTMLDivElement>(null);
-  const presentationActionAnchorRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!discussionRequest) {
-      discussionAnchorRef.current = null;
-      return;
-    }
-    if (discussionRequest.agentId === teacherParticipant?.id) {
-      discussionAnchorRef.current = teacherAvatarRef.current;
-    } else {
-      discussionAnchorRef.current =
-        studentAvatarRefs.current.get(discussionRequest.agentId || '') || null;
-    }
-  }, [discussionRequest, teacherParticipant?.id]);
-
-  // Derived state from Stage's computePlaybackView (centralised derivation)
-  const isInLiveFlow =
-    playbackView?.isInLiveFlow ??
-    !!(speakingAgentId || thinkingState || isStreaming || sessionType);
-
-  // Role-aware source text: userMessage overlay on top of playbackView
-  const sourceText = userMessage
-    ? userMessage
-    : (playbackView?.sourceText ??
-      (currentSpeech
-        ? currentSpeech
-        : isInLiveFlow
-          ? ''
-          : lectureSpeech || (playbackCompleted ? '' : idleText) || ''));
-  const hasAgentFeedback = Boolean(playbackView?.sourceText || thinkingState);
-  const prevHasAgentFeedbackRef = useRef(hasAgentFeedback);
-
-  const clearUserMessageClearTimer = useCallback(() => {
-    if (userMessageClearTimerRef.current) {
-      clearTimeout(userMessageClearTimerRef.current);
-      userMessageClearTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleUserMessageClear = useCallback(() => {
-    clearUserMessageClearTimer();
-    userMessageClearTimerRef.current = setTimeout(() => {
-      setUserMessage(null);
-      userMessageClearTimerRef.current = null;
-    }, 3000);
-  }, [clearUserMessageClearTimer]);
-
-  const showLocalUserMessage = useCallback(
-    (text: string) => {
-      setUserMessage(text);
-      // Mark as "already seen feedback" so that the immediate thinkingState
-      // transition (false→true) after user sends won't trigger the early-clear
-      // effect and swallow the user bubble.
-      prevHasAgentFeedbackRef.current = true;
-      scheduleUserMessageClear();
-    },
-    [scheduleUserMessageClear],
-  );
-
-  // Auto-scroll bubble: keep latest streaming text visible during live/discussion flow
-  useEffect(() => {
-    if (!isInLiveFlow) return;
-    const el = bubbleScrollRef.current;
-    if (!el) return;
-    const scrollableHeight = el.scrollHeight - el.clientHeight;
-    if (scrollableHeight <= 0) return;
-    el.scrollTo({ top: scrollableHeight, behavior: 'smooth' });
-  }, [sourceText, isInLiveFlow]);
-
-  // Clear user message early when agent starts responding
-  useEffect(() => {
-    const feedbackStarted = hasAgentFeedback && !prevHasAgentFeedbackRef.current;
-    if (userMessage && feedbackStarted) {
-      clearUserMessageClearTimer();
-      setUserMessage(null);
-    }
-    prevHasAgentFeedbackRef.current = hasAgentFeedback;
-  }, [clearUserMessageClearTimer, hasAgentFeedback, userMessage]);
-
-  useEffect(() => () => clearUserMessageClearTimer(), [clearUserMessageClearTimer]);
-
-  // End flash effect (Issue 3)
-  useEffect(() => {
-    if (showEndFlash) {
-      setEndFlashVisible(true);
-      const timer = setTimeout(() => setEndFlashVisible(false), 1800);
-      return () => clearTimeout(timer);
-    } else {
-      setEndFlashVisible(false);
-    }
-  }, [showEndFlash]);
-
-  // Clear send cooldown when agent bubble appears
-  useEffect(() => {
-    if (isSendCooldown && speakingAgentId) {
-      setIsSendCooldown(false);
-      isSendCooldownRef.current = false;
-    }
-  }, [isSendCooldown, speakingAgentId]);
-
-  // Safety net: clear cooldown when streaming transitions from active → ended
-  // (not when isStreaming was already false — that would clear cooldown immediately)
-  const prevStreamingRef = useRef(false);
-  useEffect(() => {
-    if (prevStreamingRef.current && !isStreaming && isSendCooldown) {
-      setIsSendCooldown(false);
-      isSendCooldownRef.current = false;
-    }
-    prevStreamingRef.current = !!isStreaming;
-  }, [isStreaming, isSendCooldown]);
-
-  // Spacebar shortcut: toggle discussion buffer-level pause/resume
-  // Much easier than clicking the small bubble during fast text streaming
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip when user is typing in an input, textarea, or contentEditable
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) {
+  const { isRecording, isProcessing, startRecording, stopRecording } = useAudioRecorder({
+    onTranscription: (text) => {
+      if (!text.trim()) {
+        toast.info(t('roundtable.noSpeechDetected'));
+        setIsVoiceOpen(false);
         return;
       }
-      if (e.code !== 'Space') return;
-
-      // Only handle during live flow (QA/Discussion)
-      if (!isInLiveFlow) return;
-
-      e.preventDefault(); // Prevent page scroll
-
-      if (isDiscussionPaused) {
-        onDiscussionResume?.();
-      } else if (!thinkingState && currentSpeech) {
-        // Same guard as bubble click: don't pause during thinking or before text arrives
-        onDiscussionPause?.();
+      if (isSendCooldownRef.current) {
+        setIsVoiceOpen(false);
+        return;
       }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    isInLiveFlow,
-    isDiscussionPaused,
-    thinkingState,
-    currentSpeech,
-    onDiscussionPause,
-    onDiscussionResume,
-  ]);
-
-  // Separate participants by role (teacherParticipant & studentParticipants declared earlier for effect)
-  const userParticipant = initialParticipants.find((p) => p.role === 'user');
-
-  const teacherAvatar = teacherParticipant?.avatar || DEFAULT_TEACHER_AVATAR;
-  const teacherName = teacherParticipant?.name || t('roundtable.teacher');
-  const userAvatar = userParticipant?.avatar || DEFAULT_USER_AVATAR;
-
-  // Audio recording
-  const { isRecording, isProcessing, startRecording, stopRecording, cancelRecording } =
-    useAudioRecorder({
-      onTranscription: (text) => {
-        if (!text.trim()) {
-          toast.info(t('roundtable.noSpeechDetected'));
-          setIsVoiceOpen(false);
-          return;
-        }
-        // Block if in send cooldown (e.g. text was sent while voice was processing)
-        if (isSendCooldownRef.current) {
-          setIsVoiceOpen(false);
-          return;
-        }
-        showLocalUserMessage(text);
-        onMessageSend?.(text);
-        setIsSendCooldown(true);
-        isSendCooldownRef.current = true;
-        setIsVoiceOpen(false);
-      },
-      onError: (error) => {
-        toast.error(error);
-        setIsVoiceOpen(false);
-      },
-    });
+      onMessageSend?.(text);
+      setIsSendCooldown(true);
+      isSendCooldownRef.current = true;
+      setIsVoiceOpen(false);
+      setTimeout(() => {
+        setIsSendCooldown(false);
+        isSendCooldownRef.current = false;
+      }, 1200);
+    },
+    onError: (error) => {
+      toast.error(error);
+    },
+  });
 
   const handleSendMessage = () => {
     if (!inputValue.trim() || isSendCooldown) return;
-
-    showLocalUserMessage(inputValue);
-    onMessageSend?.(inputValue);
+    onMessageSend?.(inputValue.trim());
+    setInputValue('');
     setIsSendCooldown(true);
     isSendCooldownRef.current = true;
-    setInputValue('');
-    setIsInputOpen(false);
-  };
-
-  const handleToggleInput = () => {
-    if (isSendCooldown) return;
-    if (!isInputOpen) {
-      onInputActivate?.();
-    }
-    setIsInputOpen(!isInputOpen);
-    // Cancel any in-flight ASR to prevent ghost auto-sends
-    if (isVoiceOpen || isProcessing) {
-      cancelRecording();
-      setIsVoiceOpen(false);
-    }
+    setTimeout(() => {
+      setIsSendCooldown(false);
+      isSendCooldownRef.current = false;
+    }, 1200);
   };
 
   const handleToggleVoice = () => {
     if (isVoiceOpen) {
       if (isRecording) stopRecording();
       setIsVoiceOpen(false);
-    } else {
-      if (isSendCooldown || isProcessing) return;
-      onInputActivate?.();
-      setIsVoiceOpen(true);
-      setIsInputOpen(false);
-      startRecording();
+      return;
     }
+    if (isSendCooldown || !asrEnabled) return;
+    onInputActivate?.();
+    setIsVoiceOpen(true);
+    startRecording();
   };
 
   const isPresentationInteractionActive = isInputOpen || isVoiceOpen || isRecording || isProcessing;
