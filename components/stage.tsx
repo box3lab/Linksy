@@ -753,7 +753,7 @@ export function Stage({
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0f1726] p-2.5">
+    <div className="flex-1 flex overflow-hidden ">
       {/* Scene Sidebar */}
       <SceneSidebar
         collapsed={sidebarCollapsed}
@@ -763,7 +763,7 @@ export function Stage({
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative rounded-r-[18px] border-[3px] border-l-0 border-slate-900/90 bg-sky-200/95">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative border-[3px] border-l-0 border-slate-900/90 bg-sky-200/95">
         {/* Header */}
         <Header currentSceneTitle={currentScene?.title || ''} />
 
