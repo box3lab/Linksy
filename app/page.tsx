@@ -572,19 +572,19 @@ function HomeSidebar({
   onOpenClassroom: (id: string) => void;
 }) {
   return (
-    <aside className="hidden lg:flex fixed left-4 top-4 bottom-4 z-30 w-[268px] rounded-[30px] border-[3px] border-sky-400/90 bg-white/88 backdrop-blur-sm shadow-[0_2px_0_rgba(56,189,248,0.25)] flex-col overflow-hidden">
-      <div className="px-4 pt-4 pb-3 border-b-2 border-sky-200/80">
+    <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-[268px] rounded-none bg-sky-200/70 border-r-[3px] border-r-slate-900/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] flex-col overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b-2 border-slate-900/70">
         <div className="flex items-center gap-2">
           <img src="/logo.png" alt="Linksy" className="h-7 w-auto" />
         </div>
-        <p className="mt-1 text-[11px] text-slate-500">
+        <p className="mt-1 text-[11px] text-slate-800/80">
           {locale === 'zh-CN' ? '课程记录与快捷入口' : 'Course History & Quick Access'}
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-hide">
         {sections.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-sky-200/90 bg-white/70 p-3 text-[12px] leading-relaxed text-slate-500">
+          <div className="rounded-2xl border-2 border-dashed border-slate-900/50 bg-white/85 p-3 text-[12px] leading-relaxed text-slate-700">
             {locale === 'zh-CN'
               ? '还没有课堂记录，点击上方按钮开始创建吧。'
               : 'No classroom history yet. Start a new class above.'}
@@ -592,21 +592,25 @@ function HomeSidebar({
         ) : (
           sections.map((section) => (
             <div key={section.key} className="space-y-1.5">
-              <p className="px-1 text-[11px] font-bold tracking-wide text-sky-700/90">
+              <p className="px-1 text-[11px] font-black tracking-wide text-slate-900/80">
                 {section.label}
               </p>
               <div className="space-y-1">
-                {section.items.map((item) => (
+                {section.items.map((item, index) => (
                   <button
                     key={item.id}
                     onClick={() => onOpenClassroom(item.id)}
-                    className="group/item w-full rounded-xl border border-sky-200/80 bg-white/80 px-2.5 py-2 text-left hover:bg-sky-50 hover:border-sky-300 transition-colors"
+                    className={cn(
+                      'group/item w-full rounded-[16px] border-2 border-slate-900/75 px-2.5 py-2 text-left transition-colors shadow-[0_2px_0_rgba(15,23,42,0.25)]',
+                      index % 2 === 0 ? 'bg-white/95' : 'bg-sky-50/85',
+                      'hover:bg-white',
+                    )}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-700 group-hover/item:text-sky-700">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-800 group-hover/item:text-slate-900">
                         {item.name}
                       </span>
-                      <MoreHorizontal className="size-3.5 text-slate-300 opacity-0 group-hover/item:opacity-100 transition-opacity" />
+                      <MoreHorizontal className="size-3.5 text-slate-400 opacity-0 group-hover/item:opacity-100 transition-opacity" />
                     </div>
                   </button>
                 ))}
