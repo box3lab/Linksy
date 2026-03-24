@@ -116,10 +116,28 @@ const InteractiveWhiteboardCanvas = forwardRef<
   const [panY, setPanY] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [hintTimedOut, setHintTimedOut] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(
+    () => typeof document !== 'undefined' && !!document.fullscreenElement,
+  );
   const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const prevElementsLengthRef = useRef(elements.length);
   const resetTimerRef = useRef<number | null>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
+  const hintTimerRef = useRef<number | null>(null);
+  const hintEpochRef = useRef(0);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Detect fullscreen to move hints away from the Roundtable overlay
+  useEffect(() => {
+    const onChange = () => {
+      const fs = !!document.fullscreenElement;
+      setIsFullscreen(fs);
+      // Re-show hint when entering fullscreen so users see it in the new context
+      if (fs) setHintTimedOut(false);
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
 
   const isViewModified = viewZoom !== 1 || panX !== 0 || panY !== 0;
 
@@ -359,21 +377,62 @@ const InteractiveWhiteboardCanvas = forwardRef<
           )}
         </AnimatePresence>
 
-        {/* Content layer — elements rendered at their raw coordinates */}
-        <div className="absolute inset-0">
-          <AnimatePresence mode="popLayout">
-            {elements.map((element, index) => (
-              <AnimatedElement
-                key={element.id}
-                element={element}
-                index={index}
-                isClearing={isClearing}
-                totalElements={elements.length}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+      <div
+        className="absolute inset-0"
+        style={{
+          transform: contentTransform,
+          transformOrigin: '0 0',
+          transition: isResetting ? 'transform 0.25s ease-out' : undefined,
+        }}
+      >
+        <AnimatePresence mode="popLayout">
+          {elements.map((element, index) => (
+            <AnimatedElement
+              key={element.id}
+              element={element}
+              index={index}
+              isClearing={isClearing}
+              totalElements={elements.length}
+            />
+          ))}
+        </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {showHint && !isViewModified && elements.length > 0 && (
+          <motion.div
+            key="zoom-hint"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.5, transition: { delay: 0.6, duration: 0.4 } }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            className={`absolute ${isFullscreen ? 'top-3' : 'bottom-3'} left-3 z-50 px-2.5 py-1 rounded-md
+              bg-black/40 text-white text-xs backdrop-blur-sm select-none pointer-events-none`}
+          >
+            {zoomHintText}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isViewModified && elements.length > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 0.7 }}
+            exit={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDoubleClick();
+            }}
+            className={`absolute ${isFullscreen ? 'top-3' : 'bottom-3'} right-3 z-50 px-2.5 py-1 rounded-md
+              bg-black/60 text-white text-xs backdrop-blur-sm
+              hover:bg-black/80 transition-colors cursor-pointer select-none`}
+          >
+            {resetViewText}
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 });

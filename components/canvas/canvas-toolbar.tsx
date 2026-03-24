@@ -167,7 +167,14 @@ export function CanvasToolbar({
 
       {/* ── Center: unified playback controls ── */}
       <div className="flex-1 flex items-center justify-center min-w-0">
-        <div className="inline-flex items-center gap-0.5 bg-white/85 rounded-2xl px-1.5 h-9 border-2 border-slate-900/80">
+        <div
+          className={cn(
+            'inline-flex items-center gap-0.5 px-1 h-7',
+            isPresenting
+              ? '' /* Single visual layer in fullscreen — buttons sit inside outer pill directly */
+              : 'bg-gray-100/60 dark:bg-gray-800/60 rounded-lg',
+          )}
+        >
           {/* Volume with vertical popover slider */}
           {onToggleMute && (
             <div
