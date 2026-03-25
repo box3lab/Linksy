@@ -463,6 +463,7 @@ function GenerationPreviewContent() {
           const { saveGeneratedAgents } = await import('@/lib/orchestration/registry/store');
           const savedIds = await saveGeneratedAgents(stage.id, agentData.agents);
           settings.setSelectedAgentIds(savedIds);
+          stage.agentIds = savedIds;
 
           // Show card-reveal modal, continue generation once all cards are revealed
           setGeneratedAgents(agentData.agents);
@@ -483,7 +484,18 @@ function GenerationPreviewContent() {
         } catch (err: unknown) {
           log.warn('[Generation] Agent generation failed, falling back to presets:', err);
           const registry = useAgentRegistry.getState();
-          agents = settings.selectedAgentIds
+          const fallbackIds = settings.selectedAgentIds.filter((id) => {
+            const a = registry.getAgent(id);
+            return a && !a.isGenerated;
+          });
+          const safeFallbackIds =
+            fallbackIds.length > 0
+              ? fallbackIds
+              : ['default-1', 'default-2', 'default-3'].filter((id) => {
+                  const a = registry.getAgent(id);
+                  return a && !a.isGenerated;
+                });
+          agents = safeFallbackIds
             .map((id) => registry.getAgent(id))
             .filter(Boolean)
             .map((a) => ({
@@ -492,11 +504,24 @@ function GenerationPreviewContent() {
               role: a!.role,
               persona: a!.persona,
             }));
+          stage.agentIds = safeFallbackIds;
         }
       } else {
         // Preset mode — use selected agents (include persona)
+        // Filter out stale generated agent IDs that may linger in settings
         const registry = useAgentRegistry.getState();
-        agents = settings.selectedAgentIds
+        const presetAgentIds = settings.selectedAgentIds.filter((id) => {
+          const a = registry.getAgent(id);
+          return a && !a.isGenerated;
+        });
+        const safePresetAgentIds =
+          presetAgentIds.length > 0
+            ? presetAgentIds
+            : ['default-1', 'default-2', 'default-3'].filter((id) => {
+                const a = registry.getAgent(id);
+                return a && !a.isGenerated;
+              });
+        agents = safePresetAgentIds
           .map((id) => registry.getAgent(id))
           .filter(Boolean)
           .map((a) => ({
@@ -505,6 +530,7 @@ function GenerationPreviewContent() {
             role: a!.role,
             persona: a!.persona,
           }));
+        stage.agentIds = safePresetAgentIds;
       }
 
       // ── Generate outlines (with agent personas for teacher context) ──
@@ -816,7 +842,7 @@ function GenerationPreviewContent() {
     return (
       <div className="relative min-h-[100dvh] w-full flex items-center justify-center p-4 overflow-hidden">
         <div className="fixed inset-0 -z-10 bg-[url('/bg.png')] bg-cover bg-center bg-no-repeat pointer-events-none" />
-        <Card className="p-8 max-w-md w-full rounded-3xl border-2 border-sky-200 bg-white/92 backdrop-blur-sm">
+        <Card className="p-8 max-w-md w-full rounded-3xl border-[3px] border-slate-900/80 bg-white/92 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)]">
           <div className="text-center space-y-4">
             <AlertCircle className="size-12 text-sky-500 mx-auto" />
             <h2 className="text-xl font-semibold text-slate-800">
@@ -825,7 +851,7 @@ function GenerationPreviewContent() {
             <p className="text-sm text-slate-500">{t('generation.sessionNotFoundDesc')}</p>
             <Button
               onClick={() => router.push('/')}
-              className="w-full rounded-full border-2 border-orange-300 bg-orange-400 text-white hover:bg-orange-500"
+              className="w-full rounded-full border-2 border-slate-900/80 bg-orange-400 text-white hover:bg-orange-500"
             >
               <ArrowLeft className="size-4 mr-2" />
               {t('generation.backToHome')}
@@ -866,7 +892,7 @@ function GenerationPreviewContent() {
           variant="ghost"
           size="sm"
           onClick={goBackToHome}
-          className="rounded-full border border-sky-200 bg-white/90 text-sky-700 hover:bg-sky-50"
+          className="rounded-full border-2 border-slate-900/80 bg-white/90 text-sky-700 hover:bg-sky-50"
         >
           <ArrowLeft className="size-4 mr-2" />
           {t('generation.backToHome')}
@@ -880,7 +906,7 @@ function GenerationPreviewContent() {
           transition={{ duration: 0.5 }}
           className="w-full"
         >
-          <Card className="relative overflow-hidden rounded-[34px] border-2 border-sky-200/90 bg-white/90 backdrop-blur-sm min-h-[400px] flex flex-col items-center justify-center p-8 md:p-12">
+          <Card className="relative overflow-hidden rounded-[34px] border-[3px] border-slate-900/80 bg-white/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] min-h-[400px] flex flex-col items-center justify-center p-8 md:p-12">
             {/* Progress Dots */}
             <div className="absolute top-6 left-0 right-0 flex justify-center gap-2">
               {activeSteps.map((step, idx) => (
@@ -908,7 +934,7 @@ function GenerationPreviewContent() {
                       key="error"
                       initial={{ scale: 0.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="size-32 rounded-full bg-orange-100/70 flex items-center justify-center border-2 border-orange-300"
+                      className="size-32 rounded-full bg-orange-100/70 flex items-center justify-center border-2 border-slate-900/75"
                     >
                       <AlertCircle className="size-16 text-orange-500" />
                     </motion.div>
@@ -917,7 +943,7 @@ function GenerationPreviewContent() {
                       key="complete"
                       initial={{ scale: 0.5, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="size-32 rounded-full bg-sky-100/70 flex items-center justify-center border-2 border-sky-300"
+                      className="size-32 rounded-full bg-sky-100/70 flex items-center justify-center border-2 border-slate-900/75"
                     >
                       <CheckCircle2 className="size-16 text-sky-500" />
                     </motion.div>
@@ -987,7 +1013,7 @@ function GenerationPreviewContent() {
                             type="button"
                             className="relative size-7 rounded-full flex items-center justify-center cursor-default
                                        bg-orange-100/80
-                                       border border-orange-300/90 hover:border-orange-400
+                                       border-2 border-slate-900/70 hover:border-slate-900/85
                                        transition-colors duration-300
                                        focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
                           >
@@ -1024,7 +1050,7 @@ function GenerationPreviewContent() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="w-full h-12 rounded-full border-2 border-sky-300 bg-white text-sky-700 hover:bg-sky-50"
+                  className="w-full h-12 rounded-full border-2 border-slate-900/80 bg-white text-sky-700 hover:bg-sky-50"
                   onClick={goBackToHome}
                 >
                   {t('generation.goBackAndRetry')}
@@ -1041,7 +1067,7 @@ function GenerationPreviewContent() {
                 {generatedAgents.length > 0 && !showAgentReveal && (
                   <button
                     onClick={() => setShowAgentReveal(true)}
-                    className="ml-2 flex items-center gap-1.5 rounded-full border border-sky-300 bg-sky-100 px-3 py-1 text-xs font-medium normal-case tracking-normal text-sky-700 transition-colors hover:bg-sky-200"
+                    className="ml-2 flex items-center gap-1.5 rounded-full border-2 border-slate-900/75 bg-sky-100 px-3 py-1 text-xs font-medium normal-case tracking-normal text-sky-700 transition-colors hover:bg-sky-200"
                   >
                     <Bot className="size-3" />
                     {t('generation.viewAgents')}

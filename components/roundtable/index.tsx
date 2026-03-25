@@ -79,7 +79,7 @@ export function Roundtable({
   showEndFlash: _showEndFlash,
   endFlashSessionType: _endFlashSessionType,
   thinkingState: _thinkingState,
-  isCueUser: _isCueUser,
+  isCueUser,
   isTopicPending: _isTopicPending,
   onDiscussionStart: _onDiscussionStart,
   onDiscussionSkip: _onDiscussionSkip,
@@ -180,7 +180,14 @@ export function Roundtable({
           {asrEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
         </button>
 
-        <div className="flex-1 rounded-xl border-[3px] border-slate-900/85 bg-white px-3.5 py-1.5">
+        <div
+          className={cn(
+            'flex-1 rounded-xl border-[3px] px-3.5 py-1.5 flex items-center transition-colors',
+            isCueUser
+              ? 'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-300/70'
+              : 'border-slate-900/85 bg-white',
+          )}
+        >
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -193,7 +200,12 @@ export function Roundtable({
             }}
             placeholder={t('roundtable.inputPlaceholder')}
             rows={1}
-            className="w-full resize-none bg-transparent border-none focus:ring-0 focus:outline-none outline-none shadow-none ring-0 text-slate-700 text-sm placeholder:text-slate-400 min-h-[24px] max-h-[56px] leading-6"
+            className={cn(
+              'w-full resize-none bg-transparent border-none focus:ring-0 focus:outline-none outline-none shadow-none ring-0 text-sm h-6 min-h-0 leading-6',
+              isCueUser
+                ? 'text-emerald-700 placeholder:text-emerald-500/80'
+                : 'text-slate-700 placeholder:text-slate-400',
+            )}
           />
         </div>
 

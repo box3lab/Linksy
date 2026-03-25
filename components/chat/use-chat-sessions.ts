@@ -44,7 +44,7 @@ interface UseChatSessionsOptions {
     agentId: string | null,
   ) => void;
   /** When provided and returns true, StreamBuffer holds on the current text item after reveal. */
-  shouldHoldAfterReveal?: () => boolean;
+  shouldHoldAfterReveal?: () => { holding: boolean; segmentDone: number } | boolean;
 }
 
 export function useChatSessions(options: UseChatSessionsOptions = {}) {
@@ -137,6 +137,19 @@ export function useChatSessions(options: UseChatSessionsOptions = {}) {
   // StreamBuffer instances per session (SSE + lecture share the same buffer model)
   const buffersRef = useRef<Map<string, StreamBuffer>>(new Map());
 
+  // Abort active stream and destroy buffers on unmount
+  useEffect(() => {
+    const buffers = buffersRef.current;
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      buffers.forEach((buf) => buf.shutdown());
+      buffers.clear();
+    };
+  }, []);
+
   // Session-scoped "paused intent" — survives buffer recreation across turns.
   // When true, newly created discussion/QA buffers are immediately paused.
   const livePausedRef = useRef(false);
@@ -216,7 +229,7 @@ export function useChatSessions(options: UseChatSessionsOptions = {}) {
 
       // For discussion/QA sessions, add pacing delays so fast models don't
       // rush through text and actions. Lecture pacing is handled by PlaybackEngine.
-      const pacingOptions = type === 'lecture' ? {} : { postTextDelayMs: 1200, actionDelayMs: 800 };
+      const pacingOptions = type === 'lecture' ? {} : { postTextDelayMs: 3000, actionDelayMs: 800 };
 
       const buffer = new StreamBuffer(
         {
@@ -394,7 +407,7 @@ export function useChatSessions(options: UseChatSessionsOptions = {}) {
           },
 
           shouldHoldAfterReveal() {
-            return shouldHoldAfterRevealRef.current?.() ?? false;
+            return shouldHoldAfterRevealRef.current?.() ?? (false as const);
           },
         },
         pacingOptions,
