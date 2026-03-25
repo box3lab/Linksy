@@ -736,6 +736,32 @@ export const useSettingsStore = create<SettingsState>()(
                   };
                 }
               }
+
+              // Validate current LLM selection against updated provider config
+              let clearedProviderId: ProviderId | undefined;
+              let clearedModelId: string | undefined;
+              if (state.providerId) {
+                const selectedProviderId = state.providerId as ProviderId;
+                const selectedCfg = newProvidersConfig[selectedProviderId];
+                const serverInfo = data.providers[selectedProviderId as string];
+                const hasServerConfig = !!serverInfo;
+                const isUsable =
+                  selectedCfg &&
+                  (!selectedCfg.requiresApiKey ||
+                    !!selectedCfg.apiKey ||
+                    !!selectedCfg.isServerConfigured ||
+                    hasServerConfig);
+                if (!isUsable) {
+                  clearedProviderId = '' as ProviderId;
+                  clearedModelId = '';
+                } else if (state.modelId) {
+                  const hasServerModelRestriction = !!serverInfo?.models?.length;
+                  if (hasServerModelRestriction && !serverInfo!.models!.includes(state.modelId)) {
+                    clearedModelId = '';
+                  }
+                }
+              }
+
               // Set flags for server-configured providers
               for (const [pid, info] of Object.entries(data.providers)) {
                 const key = pid as ProviderId;
@@ -1011,6 +1037,8 @@ export const useSettingsStore = create<SettingsState>()(
                 }),
                 ...(autoProviderId && { providerId: autoProviderId }),
                 ...(autoModelId && { modelId: autoModelId }),
+                ...(clearedProviderId !== undefined && { providerId: clearedProviderId }),
+                ...(clearedModelId !== undefined && { modelId: clearedModelId }),
               };
             });
           } catch (e) {

@@ -14,6 +14,7 @@ import { PlaybackEngine, computePlaybackView } from '@/lib/playback';
 import type { EngineMode, TriggerEvent, Effect } from '@/lib/playback';
 import { ActionEngine } from '@/lib/action/engine';
 import { createAudioPlayer } from '@/lib/utils/audio-player';
+import { useDiscussionTTS } from '@/lib/hooks/use-discussion-tts';
 import type { Action, DiscussionAction, SpeechAction } from '@/lib/types/action';
 // Playback state persistence removed — refresh always starts from the beginning
 import { ChatArea, type ChatAreaRef } from '@/components/chat/chat-area';
@@ -119,6 +120,19 @@ export function Stage({
     [selectedAgentIds, t],
   );
 
+  const selectedAgents = useMemo(
+    () =>
+      selectedAgentIds
+        .map((id) => useAgentRegistry.getState().getAgent(id))
+        .filter((a): a is AgentConfig => a != null),
+    [selectedAgentIds],
+  );
+
+  const discussionTTS = useDiscussionTTS({
+    enabled: ttsEnabled,
+    agents: selectedAgents,
+  });
+
   // Pick a student agent for discussion trigger (prioritize student > non-teacher > fallback)
   const pickStudentAgent = useCallback((): string => {
     const registry = useAgentRegistry.getState();
@@ -160,6 +174,7 @@ export function Stage({
    */
   const doSoftPause = useCallback(async () => {
     await chatAreaRef.current?.softPauseActiveSession();
+    discussionTTS.cleanup();
     // Append "..." to live speech to show interruption in roundtable bubble.
     // Only annotate when there's actual text being interrupted — during pure
     // director-thinking (prev is null, no agent assigned), leave liveSpeech
@@ -173,7 +188,7 @@ export function Stage({
     // Don't clear chatSessionType, speakingAgentId, or liveSpeech
     // Don't show end flash
     // Don't call handleEndDiscussion — engine stays in current state
-  }, []);
+  }, [discussionTTS]);
 
   /**
    * Resume a soft-paused topic: re-call /chat with existing session messages.
@@ -186,6 +201,9 @@ export function Stage({
     setSpeakingAgentId(null);
     setThinkingState({ stage: 'director' });
     setChatIsStreaming(true);
+    // Transition engine back to live — onInputActivate paused it when soft-pausing,
+    // so we must explicitly resume to keep engine mode in sync with the chat loop.
+    engineRef.current?.resume();
     // Fire new chat round — SSE events will drive thinking → agent_start → speech
     await chatAreaRef.current?.resumeActiveSession();
   }, []);
@@ -214,6 +232,13 @@ export function Stage({
     setDiscussionTrigger(null);
   }, [resetLiveState]);
 
+  /** Request failure should exit live discussion UI without hard-closing the session. */
+  const handleLiveSessionError = useCallback(() => {
+    engineRef.current?.handleDiscussionError();
+    resetLiveState();
+    setActiveBubbleId(null);
+  }, [resetLiveState]);
+
   /**
    * Unified session cleanup — called by both roundtable stop button and chat area end button.
    * Handles: engine transition, flash, roundtable state clearing.
@@ -233,8 +258,9 @@ export function Stage({
       setTimeout(() => setShowEndFlash(false), 1800);
     }
 
+    discussionTTS.cleanup();
     resetLiveState();
-  }, [chatSessionType, resetLiveState]);
+  }, [chatSessionType, discussionTTS, resetLiveState]);
 
   // Shared stop-discussion handler (used by both Roundtable and Canvas toolbar)
   const handleStopDiscussion = useCallback(async () => {
@@ -968,10 +994,12 @@ export function Stage({
             isDiscussionPaused={isDiscussionPaused}
             onDiscussionPause={() => {
               chatAreaRef.current?.pauseActiveLiveBuffer();
+              discussionTTS.pause();
               setIsDiscussionPaused(true);
             }}
             onDiscussionResume={() => {
               chatAreaRef.current?.resumeActiveLiveBuffer();
+              discussionTTS.resume();
               setIsDiscussionPaused(false);
             }}
             totalActions={totalActions}
@@ -1039,7 +1067,10 @@ export function Stage({
         onCueUser={(_fromAgentId, _prompt) => {
           setIsCueUser(true);
         }}
+        onLiveSessionError={handleLiveSessionError}
         onStopSession={doSessionCleanup}
+        onSegmentSealed={discussionTTS.handleSegmentSealed}
+        shouldHoldAfterReveal={discussionTTS.shouldHold}
       />
 
       {/* Scene switch confirmation dialog */}
