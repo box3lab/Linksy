@@ -84,7 +84,7 @@ export function AgentBar() {
     <div className="flex items-center gap-1.5 shrink-0">
       {/* Teacher avatar — always shown */}
       {teacherAgent && (
-        <div className="size-8 rounded-full overflow-hidden ring-2 ring-sky-300/80 shrink-0">
+        <div className="size-8 rounded-full overflow-hidden ring-2 ring-slate-900/30 shrink-0">
           <img
             src={teacherAgent.avatar}
             alt={getAgentName(teacherAgent)}
@@ -148,12 +148,12 @@ export function AgentBar() {
           <button
             className={cn(
               'group flex items-center gap-2 cursor-pointer rounded-full px-2.5 py-2 transition-colors w-full',
-              'border-2 border-sky-200/80 bg-white/90 text-slate-700 hover:border-sky-300 hover:bg-sky-50',
+              'border-2 border-slate-900/70 bg-white/90 text-slate-700 hover:border-slate-900/85 hover:bg-sky-50',
             )}
             onClick={() => setOpen(!open)}
           >
             {/* Left side — text changes based on open/close */}
-            <span className="text-xs text-sky-600/90 group-hover:text-sky-700 transition-colors hidden sm:block font-medium flex-1 text-left">
+            <span className="text-xs text-slate-600 group-hover:text-slate-800 transition-colors hidden sm:block font-medium flex-1 text-left">
               {open ? t('agentBar.expandedTitle') : t('agentBar.readyToLearn')}
             </span>
 
@@ -162,9 +162,9 @@ export function AgentBar() {
 
             {/* Chevron */}
             {open ? (
-              <ChevronUp className="size-3 text-sky-500 group-hover:text-sky-600 transition-colors" />
+              <ChevronUp className="size-3 text-slate-500 group-hover:text-slate-700 transition-colors" />
             ) : (
-              <ChevronDown className="size-3 text-sky-500 group-hover:text-sky-600 transition-colors" />
+              <ChevronDown className="size-3 text-slate-500 group-hover:text-slate-700 transition-colors" />
             )}
           </button>
         </TooltipTrigger>
@@ -185,15 +185,15 @@ export function AgentBar() {
             transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             className="absolute right-0 top-full mt-1 z-50 w-80"
           >
-            <div className="rounded-2xl bg-white/96 backdrop-blur-sm border-2 border-sky-200/80 px-2.5 py-2">
+            <div className="rounded-2xl bg-white/96 backdrop-blur-sm border-2 border-slate-900/70 shadow-[0_2px_0_rgba(15,23,42,0.15)] px-2.5 py-2">
               {/* Mode tabs — full width, 50/50 */}
-              <div className="flex rounded-lg border border-sky-200 bg-sky-50/70 p-0.5 mb-2.5">
+              <div className="flex rounded-lg border border-slate-900/25 bg-sky-50/70 p-0.5 mb-2.5">
                 <button
                   onClick={() => handleModeChange('preset')}
                   className={cn(
                     'flex-1 py-1.5 text-xs font-medium rounded-md transition-all text-center',
                     agentMode === 'preset'
-                      ? 'bg-white text-slate-800 border border-sky-200'
+                      ? 'bg-white text-slate-800 border border-slate-900/25'
                       : 'text-slate-500 hover:text-slate-700',
                   )}
                 >
@@ -204,7 +204,7 @@ export function AgentBar() {
                   className={cn(
                     'flex-1 py-1.5 text-xs font-medium rounded-md transition-all text-center flex items-center justify-center gap-1',
                     agentMode === 'auto'
-                      ? 'bg-white text-slate-800 border border-sky-200'
+                      ? 'bg-white text-slate-800 border border-slate-900/25'
                       : 'text-slate-500 hover:text-slate-700',
                   )}
                 >
@@ -233,7 +233,7 @@ export function AgentBar() {
                           <div
                             className={cn(
                               'size-8 rounded-full overflow-hidden shrink-0 ring-1',
-                              isSelected ? 'ring-sky-300' : 'ring-slate-200',
+                              isSelected ? 'ring-slate-900/35' : 'ring-slate-200',
                             )}
                           >
                             <img
@@ -266,7 +266,7 @@ export function AgentBar() {
               ) : (
                 /* Auto-generate mode */
                 <div className="flex flex-col items-center pt-6 pb-2 gap-8">
-                  <div className="size-14 rounded-full bg-sky-100 flex items-center justify-center border border-sky-200">
+                  <div className="size-14 rounded-full bg-sky-100 flex items-center justify-center border border-slate-900/20">
                     <Shuffle className="size-7 text-orange-500" />
                   </div>
                   <p className="text-xs text-slate-500 text-center">
@@ -276,7 +276,7 @@ export function AgentBar() {
               )}
 
               {/* Max turns — always visible */}
-              <div className="pt-2.5 mt-2.5 border-t border-sky-100 flex items-center gap-3">
+              <div className="pt-2.5 mt-2.5 border-t border-slate-900/15 flex items-center gap-3">
                 <span className="text-xs text-slate-500 shrink-0">{t('settings.maxTurns')}</span>
                 <Input
                   type="number"
@@ -284,7 +284,7 @@ export function AgentBar() {
                   max="20"
                   value={maxTurns}
                   onChange={(e) => setMaxTurns(e.target.value)}
-                  className="w-16 h-7 text-xs border-sky-200"
+                  className="w-16 h-7 text-xs border-slate-900/25"
                 />
               </div>
             </div>

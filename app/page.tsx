@@ -7,10 +7,7 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
-  Clock,
-  Copy,
   ImagePlus,
-  PlusCircle,
   Pencil,
   Trash2,
   Settings,
@@ -20,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { createLogger } from '@/lib/logger';
-import { Button } from '@/components/ui/button';
 import { Textarea as UITextarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { SettingsDialog } from '@/components/settings';
@@ -31,14 +27,7 @@ import { storePdfBlob } from '@/lib/utils/image-storage';
 import type { UserRequirements } from '@/lib/types/generation';
 import { useSettingsStore } from '@/lib/store/settings';
 import { useUserProfileStore, AVATAR_OPTIONS } from '@/lib/store/user-profile';
-import {
-  StageListItem,
-  listStages,
-  deleteStageData,
-  getFirstSlideByStages,
-} from '@/lib/utils/stage-storage';
-import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
-import type { Slide } from '@/lib/types/slides';
+import { StageListItem, listStages, deleteStageData } from '@/lib/utils/stage-storage';
 import { useMediaGenerationStore } from '@/lib/store/media-generation';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -124,8 +113,6 @@ function HomePage() {
   const [languageOpen, setLanguageOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<StageListItem[]>([]);
-  const [thumbnails, setThumbnails] = useState<Record<string, Slide>>({});
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -145,11 +132,6 @@ function HomePage() {
     try {
       const list = await listStages();
       setClassrooms(list);
-      // Load first slide thumbnails
-      if (list.length > 0) {
-        const slides = await getFirstSlideByStages(list.map((c) => c.id));
-        setThumbnails(slides);
-      }
     } catch (err) {
       log.error('Failed to load classrooms:', err);
     }
@@ -166,13 +148,7 @@ function HomePage() {
     loadClassrooms();
   }, []);
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPendingDeleteId(id);
-  };
-
   const confirmDelete = async (id: string) => {
-    setPendingDeleteId(null);
     try {
       await deleteStageData(id);
       await loadClassrooms();
@@ -290,23 +266,13 @@ function HomePage() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return t('classroom.today');
-    if (diffDays === 1) return t('classroom.yesterday');
-    if (diffDays < 7) return `${diffDays} ${t('classroom.daysAgo')}`;
-    return date.toLocaleDateString();
-  };
-
   const sidebarSections = useMemo(() => {
     const dayMs = 1000 * 60 * 60 * 24;
     const today: StageListItem[] = [];
     const yesterday: StageListItem[] = [];
+    const dayBeforeYesterday: StageListItem[] = [];
     const withinSevenDays: StageListItem[] = [];
+    const withinThirtyDays: StageListItem[] = [];
     const older: StageListItem[] = [];
 
     for (const item of classrooms) {
@@ -315,29 +281,31 @@ function HomePage() {
         today.push(item);
       } else if (diffDays === 1) {
         yesterday.push(item);
+      } else if (diffDays === 2) {
+        dayBeforeYesterday.push(item);
       } else if (diffDays < 7) {
         withinSevenDays.push(item);
+      } else if (diffDays < 30) {
+        withinThirtyDays.push(item);
       } else {
         older.push(item);
       }
     }
 
+    const dayBeforeYesterdayLabel = locale === 'zh-CN' ? '前天' : 'Day Before Yesterday';
     const sevenDaysLabel = locale === 'zh-CN' ? '7天内' : 'Within 7 Days';
+    const thirtyDaysLabel = locale === 'zh-CN' ? '30天内' : 'Within 30 Days';
     const olderLabel = locale === 'zh-CN' ? '更早' : 'Earlier';
 
     return [
       { key: 'today', label: t('classroom.today'), items: today },
       { key: 'yesterday', label: t('classroom.yesterday'), items: yesterday },
+      { key: 'dayBeforeYesterday', label: dayBeforeYesterdayLabel, items: dayBeforeYesterday },
       { key: 'sevenDays', label: sevenDaysLabel, items: withinSevenDays },
+      { key: 'thirtyDays', label: thirtyDaysLabel, items: withinThirtyDays },
       { key: 'older', label: olderLabel, items: older },
     ].filter((section) => section.items.length > 0);
   }, [classrooms, locale, t]);
-
-  const handleNewConversation = () => {
-    updateForm('requirement', '');
-    setError(null);
-    textareaRef.current?.focus();
-  };
 
   const canGenerate = !!form.requirement.trim();
 
@@ -354,7 +322,6 @@ function HomePage() {
       <HomeSidebar
         sections={sidebarSections}
         locale={locale}
-        onStartNew={handleNewConversation}
         onOpenClassroom={(id) => router.push(`/classroom/${id}`)}
         onDeleteClassroom={async (id) => {
           const confirmed = window.confirm(`${t('classroom.deleteConfirmTitle')}?`);
@@ -363,11 +330,11 @@ function HomePage() {
         }}
       />
 
-      <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 md:p-8 lg:pl-[296px]">
+      <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 md:p-8 lg:pl-[296px] lg:pr-6">
         {/* ═══ Top-right pill (unchanged) ═══ */}
         <div
           ref={toolbarRef}
-          className="fixed top-4 right-4 z-50 flex items-center gap-1 bg-white/92 backdrop-blur-md px-2 py-1.5 rounded-full border-2 border-slate-900/60 shadow-sm"
+          className="fixed top-4 right-4 z-50 flex items-center gap-1 bg-white/92 backdrop-blur-md px-2 py-1.5 rounded-full border-2 border-slate-900/70 shadow-[0_2px_0_rgba(15,23,42,0.2)]"
         >
           {/* Language Selector */}
           <div className="relative">
@@ -380,7 +347,7 @@ function HomePage() {
               {locale === 'zh-CN' ? 'CN' : 'EN'}
             </button>
             {languageOpen && (
-              <div className="absolute top-full mt-2 right-0 bg-white border-2 border-slate-900/70 rounded-lg shadow-lg overflow-hidden z-50 min-w-[120px]">
+              <div className="absolute top-full mt-2 right-0 bg-white border-2 border-slate-900/80 rounded-lg shadow-lg overflow-hidden z-50 min-w-[120px]">
                 <button
                   onClick={() => {
                     setLocale('zh-CN');
@@ -409,7 +376,7 @@ function HomePage() {
             )}
           </div>
 
-          <div className="w-[1px] h-4 bg-slate-300" />
+          <div className="w-[1px] h-4 bg-black" />
 
           {/* Settings Button */}
           <div className="relative">
@@ -478,7 +445,7 @@ function HomePage() {
             transition={{ delay: 0.18, duration: 0.2 }}
             className="w-full"
           >
-            <div className="w-full rounded-[34px] border-[3px] border-sky-400/90 bg-gradient-to-b from-white/95 to-sky-50/90 shadow-[0_2px_0_rgba(56,189,248,0.25)] backdrop-blur-sm transition-colors">
+            <div className="w-full rounded-[34px] border-[3px] border-slate-900/80 bg-gradient-to-b from-white/95 to-sky-50/90 shadow-[0_2px_0_rgba(15,23,42,0.2)] backdrop-blur-sm transition-colors">
               {/* ── Greeting + Profile + Agents ── */}
               <div className="relative z-20 flex items-start justify-between">
                 <GreetingBar />
@@ -499,7 +466,7 @@ function HomePage() {
               />
 
               {/* Toolbar row */}
-              <div className="px-5 pb-2 pt-2.5 flex items-center gap-2.5 border-t-2 border-sky-200/80 bg-sky-50/65 rounded-b-[30px]">
+              <div className="px-5 pb-2 pt-2.5 flex items-center gap-2.5 border-t-2 border-slate-900/25 bg-sky-50/65 rounded-b-[30px]">
                 <div className="flex-1 min-w-0">
                   <GenerationToolbar
                     language={form.language}
@@ -573,24 +540,22 @@ function HomePage() {
 function HomeSidebar({
   sections,
   locale,
-  onStartNew,
   onOpenClassroom,
   onDeleteClassroom,
 }: {
   sections: Array<{ key: string; label: string; items: StageListItem[] }>;
   locale: 'zh-CN' | 'en-US';
-  onStartNew: () => void;
   onOpenClassroom: (id: string) => void;
   onDeleteClassroom: (id: string) => void;
 }) {
   const { t } = useI18n();
   return (
-    <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-[268px] rounded-none bg-sky-200/70 border-r-[3px] border-r-slate-900/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] flex-col overflow-hidden">
-      <div className="px-4 pt-4 pb-3 border-b-2 border-slate-900/70">
+    <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-[272px] rounded-none bg-sky-200/75 border-r-[3px] border-r-slate-900/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] flex-col overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b-2 border-slate-900/70 bg-sky-100/35">
         <div className="flex items-center gap-2">
           <img src="/logo_t.png" alt="Linksy" className="h-12 w-auto" />
         </div>
-        <p className="mt-1 text-[11px] text-slate-800/80">
+        <p className="mt-1 text-[11px] text-slate-700/85">
           {locale === 'zh-CN'
             ? '多智能体互动课堂中的生成式学习'
             : 'Generative Learning in Multi-Agent Interactive Classroom'}
@@ -599,15 +564,20 @@ function HomeSidebar({
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-hide">
         {sections.length === 0 ? (
-          <div className="text-[12px] leading-relaxed text-slate-700">
+          <div className="rounded-2xl border-2 border-dashed border-slate-900/35 bg-white/65 p-3 text-[12px] leading-relaxed text-slate-600">
             {locale === 'zh-CN' ? '还没有课堂记录。' : 'No classroom history yet.'}
           </div>
         ) : (
           sections.map((section) => (
             <div key={section.key} className="space-y-1.5">
-              <p className="px-1 text-[11px] font-black tracking-wide text-slate-900/80">
-                {section.label}
-              </p>
+              <div className="px-1 flex items-center justify-between">
+                <p className="text-[11px] font-black tracking-wide text-sky-700/95">
+                  {section.label}
+                </p>
+                <span className="text-[10px] font-bold rounded-full bg-white/85 border border-slate-900/20 px-1.5 py-px text-slate-500">
+                  {section.items.length}
+                </span>
+              </div>
               <div className="space-y-1">
                 {section.items.map((item, index) => (
                   <div
@@ -622,20 +592,20 @@ function HomeSidebar({
                       }
                     }}
                     className={cn(
-                      'group/item w-full rounded-[16px] border-2 border-slate-900/75 px-2.5 py-2 text-left transition-colors shadow-[0_2px_0_rgba(15,23,42,0.25)]',
-                      index % 2 === 0 ? 'bg-white/95' : 'bg-sky-50/85',
-                      'hover:bg-white',
+                      'group/item w-full rounded-[16px] border-2 border-slate-900/70 px-2.5 py-2 text-left transition-colors shadow-[0_2px_0_rgba(15,23,42,0.2)]',
+                      index % 2 === 0 ? 'bg-white/92' : 'bg-sky-50/85',
+                      'hover:bg-white hover:border-slate-900/85',
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-800 group-hover/item:text-slate-900">
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-700 group-hover/item:text-sky-700">
                         {item.name}
                       </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"
-                            className="size-6 rounded-full flex items-center justify-center text-slate-400 opacity-100 transition-opacity hover:bg-white"
+                            className="size-6 rounded-full flex items-center justify-center text-slate-400 opacity-90 transition-opacity hover:bg-white hover:text-sky-600"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreHorizontal className="size-3.5" />
@@ -766,11 +736,11 @@ function GreetingBar() {
       {/* ── Collapsed pill (always in flow) ── */}
       {!open && (
         <div
-          className="flex items-center gap-2.5 cursor-pointer transition-colors group rounded-full px-2.5 py-1.5 border-2 border-sky-200/80 bg-white/90 text-slate-700 hover:border-sky-300 hover:bg-sky-50"
+          className="flex items-center gap-2.5 cursor-pointer transition-colors group rounded-full px-2.5 py-1.5 border-2 border-slate-900/70 bg-white/90 text-slate-700 hover:border-slate-900/85 hover:bg-sky-50"
           onClick={() => setOpen(true)}
         >
           <div className="shrink-0 relative">
-            <div className="size-8 rounded-full overflow-hidden ring-2 ring-sky-200 group-hover:ring-sky-300 transition-colors">
+            <div className="size-8 rounded-full overflow-hidden ring-2 ring-slate-900/25 group-hover:ring-slate-900/40 transition-colors">
               <img src={avatar} alt="" className="size-full object-cover" />
             </div>
             <div className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-orange-100 border border-orange-200 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
@@ -782,14 +752,14 @@ function GreetingBar() {
               <TooltipTrigger asChild>
                 <span className="leading-none select-none flex items-center gap-1">
                   <span>
-                    <span className="text-xs text-sky-600/90 group-hover:text-sky-700 transition-colors">
+                    <span className="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">
                       {t('home.greeting')}
                     </span>
                     <span className="text-[13px] font-semibold text-slate-800 group-hover:text-slate-900 transition-colors">
                       {displayName}
                     </span>
                   </span>
-                  <ChevronDown className="size-3 text-sky-400 group-hover:text-sky-600 transition-colors shrink-0" />
+                  <ChevronDown className="size-3 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={4}>
@@ -810,7 +780,7 @@ function GreetingBar() {
             transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
             className="absolute left-4 top-3.5 z-50 w-72"
           >
-            <div className="rounded-2xl bg-white/96 backdrop-blur-sm border-2 border-sky-200/80 px-3 py-2.5">
+            <div className="rounded-2xl bg-white/96 backdrop-blur-sm border-2 border-slate-900/70 px-3 py-2.5 shadow-[0_2px_0_rgba(15,23,42,0.15)]">
               {/* ── Row: avatar + name ── */}
               <div
                 className="flex items-center gap-2.5 cursor-pointer transition-colors"
@@ -828,7 +798,7 @@ function GreetingBar() {
                     setAvatarPickerOpen(!avatarPickerOpen);
                   }}
                 >
-                  <div className="size-8 rounded-full overflow-hidden ring-2 ring-sky-300/80 transition-colors">
+                  <div className="size-8 rounded-full overflow-hidden ring-2 ring-slate-900/35 transition-colors">
                     <img src={avatar} alt="" className="size-full object-cover" />
                   </div>
                   <motion.div
@@ -862,11 +832,11 @@ function GreetingBar() {
                         onBlur={commitName}
                         maxLength={20}
                         placeholder={t('profile.defaultNickname')}
-                        className="flex-1 min-w-0 h-6 bg-transparent border-b border-sky-200 text-[13px] font-semibold text-slate-800 outline-none placeholder:text-slate-400"
+                        className="flex-1 min-w-0 h-6 bg-transparent border-b border-slate-900/25 text-[13px] font-semibold text-slate-800 outline-none placeholder:text-slate-400"
                       />
                       <button
                         onClick={commitName}
-                        className="shrink-0 size-5 rounded flex items-center justify-center text-sky-600 hover:bg-sky-100"
+                        className="shrink-0 size-5 rounded flex items-center justify-center text-slate-700 hover:bg-sky-100"
                       >
                         <Check className="size-3" />
                       </button>
@@ -882,7 +852,7 @@ function GreetingBar() {
                       <span className="text-[13px] font-semibold text-slate-800 group-hover/name:text-slate-900 transition-colors">
                         {displayName}
                       </span>
-                      <Pencil className="size-2.5 text-sky-400 opacity-0 group-hover/name:opacity-100 transition-opacity" />
+                      <Pencil className="size-2.5 text-slate-500 opacity-0 group-hover/name:opacity-100 transition-opacity" />
                     </span>
                   )}
                 </div>
@@ -893,7 +863,7 @@ function GreetingBar() {
                   animate={{ opacity: 1, y: 0 }}
                   className="shrink-0 size-6 rounded-full flex items-center justify-center hover:bg-sky-100 transition-colors"
                 >
-                  <ChevronUp className="size-3.5 text-sky-500" />
+                  <ChevronUp className="size-3.5 text-slate-600" />
                 </motion.div>
               </div>
 
@@ -957,155 +927,6 @@ function GreetingBar() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ─── Classroom Card — clean, minimal style ──────────────────────
-function ClassroomCard({
-  classroom,
-  slide,
-  formatDate,
-  onDelete,
-  confirmingDelete,
-  onConfirmDelete,
-  onCancelDelete,
-  onClick,
-}: {
-  classroom: StageListItem;
-  slide?: Slide;
-  formatDate: (ts: number) => string;
-  onDelete: (id: string, e: React.MouseEvent) => void;
-  confirmingDelete: boolean;
-  onConfirmDelete: () => void;
-  onCancelDelete: () => void;
-  onClick: () => void;
-}) {
-  const { t } = useI18n();
-  const thumbRef = useRef<HTMLDivElement>(null);
-  const [thumbWidth, setThumbWidth] = useState(0);
-
-  useEffect(() => {
-    const el = thumbRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setThumbWidth(Math.round(entry.contentRect.width));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  return (
-    <div className="group cursor-pointer" onClick={confirmingDelete ? undefined : onClick}>
-      {/* Thumbnail — large radius, no border, subtle bg */}
-      <div
-        ref={thumbRef}
-        className="relative w-full aspect-[16/9] rounded-3xl border-[3px] border-sky-300/80 bg-sky-50 overflow-hidden transition-colors duration-200 group-hover:border-sky-400 group-hover:bg-sky-100/70"
-      >
-        {slide && thumbWidth > 0 ? (
-          <ThumbnailSlide
-            slide={slide}
-            size={thumbWidth}
-            viewportSize={slide.viewportSize ?? 1000}
-            viewportRatio={slide.viewportRatio ?? 0.5625}
-          />
-        ) : !slide ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="size-12 rounded-2xl bg-white border border-sky-200 flex items-center justify-center">
-              <span className="text-xl opacity-50">📄</span>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Delete — top-right, only on hover */}
-        <AnimatePresence>
-          {!confirmingDelete && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute top-2 right-2 size-7 opacity-0 group-hover:opacity-100 transition-opacity bg-white hover:bg-red-500 text-slate-700 hover:text-white rounded-full border border-slate-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(classroom.id, e);
-                }}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Inline delete confirmation overlay */}
-        <AnimatePresence>
-          {confirmingDelete && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/55"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span className="text-[13px] font-medium text-white/90">
-                {t('classroom.deleteConfirmTitle')}?
-              </span>
-              <div className="flex gap-2">
-                <button
-                  className="px-3.5 py-1 rounded-lg text-[12px] font-medium bg-white/15 text-white/80 hover:bg-white/25 backdrop-blur-sm transition-colors"
-                  onClick={onCancelDelete}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  className="px-3.5 py-1 rounded-lg text-[12px] font-medium bg-red-500/90 text-white hover:bg-red-500 transition-colors"
-                  onClick={onConfirmDelete}
-                >
-                  {t('classroom.delete')}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Info — outside the thumbnail */}
-      <div className="mt-2.5 px-1 flex items-center gap-2">
-        <span className="shrink-0 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-700 transition-colors duration-200 group-hover:bg-orange-200">
-          {classroom.sceneCount} {t('classroom.slides')} · {formatDate(classroom.updatedAt)}
-        </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <p className="font-semibold text-[15px] truncate text-slate-700 min-w-0 transition-colors duration-200 group-hover:text-sky-700">
-              {classroom.name}
-            </p>
-          </TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            sideOffset={4}
-            className="!max-w-[min(90vw,32rem)] break-words whitespace-normal"
-          >
-            <div className="flex items-center gap-1.5">
-              <span className="break-all">{classroom.name}</span>
-              <button
-                className="shrink-0 p-0.5 rounded hover:bg-foreground/10 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(classroom.name);
-                  toast.success(t('classroom.nameCopied'));
-                }}
-              >
-                <Copy className="size-3 opacity-60" />
-              </button>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </div>
     </div>
   );
 }
