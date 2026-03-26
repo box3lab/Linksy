@@ -6,6 +6,7 @@ import { PENDING_SCENE_ID } from '@/lib/store/stage';
 import { useCanvasStore } from '@/lib/store/canvas';
 import { PLAYBACK_SPEEDS, useSettingsStore } from '@/lib/store/settings';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { cn } from '@/lib/utils';
 import { SceneSidebar } from './stage/scene-sidebar';
 import { Header } from './header';
 import { CanvasArea } from '@/components/canvas/canvas-area';
@@ -924,7 +925,10 @@ export function Stage({
 
         {/* Roundtable Area */}
         {mode === 'playback' && (
-          <Roundtable
+          <div
+            className={cn('transition-opacity duration-300', 'shrink-0')}
+          >
+            <Roundtable
             mode={mode}
             initialParticipants={participants}
             playbackView={playbackView}
@@ -1025,7 +1029,8 @@ export function Stage({
             onPrevSlide={handlePreviousScene}
             onNextSlide={handleNextScene}
             onWhiteboardClose={handleWhiteboardToggle}
-          />
+            />
+          </div>
         )}
       </div>
 
