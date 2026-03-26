@@ -172,7 +172,7 @@ export const ProactiveCard = ({
           {/* Header */}
           <div className="flex items-center gap-2 px-0.5 pt-1">
             {agentAvatar && (
-              <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 border border-gray-100 dark:border-gray-700">
+              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-gray-100 dark:border-gray-700">
                 <img
                   src={agentAvatar}
                   alt={agentName || ''}
