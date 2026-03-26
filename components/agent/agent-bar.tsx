@@ -105,7 +105,7 @@ export function AgentBar() {
           {/* In auto mode: show assistant avatar + shuffle indicator */}
           <div className="flex -space-x-2">
             {agents.find((a) => a.role === 'assistant') && (
-              <div className="size-6 rounded-full overflow-hidden ring-[1.5px] ring-background">
+              <div className="size-8 rounded-full overflow-hidden ring-[1.5px] ring-background">
                 <img
                   src={agents.find((a) => a.role === 'assistant')!.avatar}
                   alt=""
@@ -124,7 +124,7 @@ export function AgentBar() {
               {nonTeacherSelected.slice(0, 4).map((agent) => (
                 <div
                   key={agent.id}
-                  className="size-6 rounded-full overflow-hidden ring-[1.5px] ring-background"
+                  className="size-8 rounded-full overflow-hidden ring-[1.5px] ring-background"
                 >
                   <img
                     src={agent.avatar}
@@ -134,7 +134,7 @@ export function AgentBar() {
                 </div>
               ))}
               {nonTeacherSelected.length > 4 && (
-                <div className="size-6 rounded-full bg-muted ring-[1.5px] ring-background flex items-center justify-center">
+                <div className="size-8 rounded-full bg-muted ring-[1.5px] ring-background flex items-center justify-center">
                   <span className="text-[9px] font-bold text-muted-foreground">
                     +{nonTeacherSelected.length - 4}
                   </span>
@@ -239,7 +239,7 @@ export function AgentBar() {
                           <Checkbox checked={isSelected} className="pointer-events-none" />
                           <div
                             className={cn(
-                              'size-8 rounded-full overflow-hidden shrink-0 ring-1',
+                              'size-10 rounded-full overflow-hidden shrink-0 ring-1',
                               isSelected ? 'ring-slate-900/35' : 'ring-slate-200',
                             )}
                           >

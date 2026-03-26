@@ -67,10 +67,10 @@ export function LectureNotesView({ notes, currentSceneId }: LectureNotesViewProp
             key={note.sceneId}
             data-scene-id={note.sceneId}
             className={cn(
-              'relative mb-3 last:mb-0 rounded-2xl px-3 py-2.5 transition-colors duration-200 border-2',
+              'relative mb-3 last:mb-0 rounded-2xl px-3 py-2.5 transition-colors duration-200 border-[3px]',
               isCurrent
-                ? 'bg-white border-sky-300/80 ring-1 ring-sky-200/70'
-                : 'bg-white/78 border-slate-200/85',
+                ? 'bg-white border-slate-900/80 ring-1 ring-sky-200/70'
+                : 'bg-white/78 border-slate-900/60',
             )}
           >
             <div
@@ -150,7 +150,7 @@ export function LectureNotesView({ notes, currentSceneId }: LectureNotesViewProp
                     return (
                       <div
                         key={i}
-                        className="my-1.5 flex items-start gap-1.5 rounded-lg border border-amber-200/70 bg-amber-50/70 px-2 py-1.5"
+                        className="my-1.5 flex items-start gap-1.5 rounded-lg border-[3px] border-slate-900/60 bg-amber-50/70 px-2 py-1.5"
                       >
                         <MessageSquare className="w-3 h-3 text-amber-500 shrink-0 mt-0.5" />
                         <span className="text-[11px] leading-snug text-amber-800">{row.label}</span>

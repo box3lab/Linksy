@@ -420,7 +420,7 @@ function HomePage() {
         >
           {/* ── Logo ── */}
           <motion.img
-            src="/logo_t.png"
+            src={locale === 'zh-CN' ? '/logo_t.png' : '/logo_t_e.png'}
             alt="Linksy"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, scale: 1.8 }}
@@ -553,7 +553,11 @@ function HomeSidebar({
     <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-30 w-[272px] rounded-none bg-sky-200/75 border-r-[4px] border-r-slate-900/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] flex-col overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b-[3px] border-slate-900/70 bg-sky-100/35">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Linksy" className="h-15 w-auto" />
+          <img
+            src={locale === 'zh-CN' ? '/logo.png' : '/logo_e.png'}
+            alt="Linksy"
+            className="h-15 w-auto"
+          />
         </div>
         {/* <p className="mt-1 text-[11px] text-slate-700/85">
           {locale === 'zh-CN'

@@ -36,7 +36,7 @@ export function SceneSidebar({
   onSceneSelect,
   onRetryOutline,
 }: SceneSidebarProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const { scenes, currentSceneId, setCurrentSceneId, generatingOutlines, generationStatus } =
     useStageStore();
@@ -126,7 +126,11 @@ export function SceneSidebar({
             className="flex items-center gap-2 cursor-pointer rounded-2xl px-2 -mx-2 py-1.5 -my-1.5 hover:bg-white/50 active:scale-[0.97] transition-all duration-150"
             title={t('generation.backToHome')}
           >
-            <img src="/logo_t.png" alt="Linksy" className="h-11" />
+            <img
+              src={locale === 'zh-CN' ? '/logo_t.png' : '/logo_t_e.png'}
+              alt="Linksy"
+              className="h-11"
+            />
           </button>
           <button
             onClick={() => onCollapseChange(true)}

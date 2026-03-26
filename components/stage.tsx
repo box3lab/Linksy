@@ -889,7 +889,7 @@ export function Stage({
                 }`}
               >
                 <div
-                  className={`w-8 h-8 rounded-full overflow-hidden border-[3px] bg-white shrink-0 flex items-center justify-center ${
+                  className={`w-14 h-14 rounded-full overflow-hidden border-[3px] bg-white shrink-0 flex items-center justify-center ${
                     speakerDisplay.side === 'left' ? 'border-sky-500/80' : 'border-orange-500/80'
                   }`}
                 >

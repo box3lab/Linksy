@@ -47,7 +47,7 @@ export const commonEnUS = {
     loading: 'Loading...',
   },
   home: {
-    slogan: 'Master Linksy, grasp it instantly.',
+    slogan: 'Master Insight, Ignite the Mind. ',
     greeting: 'Hi, ',
   },
   toolbar: {
