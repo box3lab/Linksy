@@ -1,6 +1,15 @@
 'use client';
 
-import { Settings, ArrowLeft, Loader2, Download, FileDown, Package } from 'lucide-react';
+import {
+  Settings,
+  ArrowLeft,
+  Loader2,
+  Download,
+  FileDown,
+  Package,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,6 +29,7 @@ export function Header({ currentSceneTitle }: HeaderProps) {
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Model setup state
   const currentModelId = useSettingsStore((s) => s.modelId);
@@ -62,6 +72,27 @@ export function Header({ currentSceneTitle }: HeaderProps) {
     }
   }, [languageOpen, exportMenuOpen, handleClickOutside]);
 
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    onFullscreenChange();
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // Ignore browser fullscreen failures
+    }
+  };
+
   return (
     <>
       <header className="h-20 px-6 flex items-center justify-between z-10 bg-transparent gap-4">
@@ -77,6 +108,15 @@ export function Header({ currentSceneTitle }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 px-1 py-1 shrink-0">
+          {/* Fullscreen Button */}
+          <button
+            onClick={toggleFullscreen}
+            className="shrink-0 h-10 px-3 rounded-full border-[4px] border-slate-900 transition-all flex items-center justify-center bg-white text-slate-600 hover:bg-sky-50 hover:text-sky-700"
+            title={isFullscreen ? t('stage.exitFullscreen') : t('stage.fullscreen')}
+            aria-label={isFullscreen ? t('stage.exitFullscreen') : t('stage.fullscreen')}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
           {/* Language Selector */}
           <div className="relative" ref={languageRef}>
             <button
