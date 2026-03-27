@@ -9,6 +9,7 @@ import { ThemeProvider } from '@/lib/hooks/use-theme';
 import { I18nProvider } from '@/lib/hooks/use-i18n';
 import { Toaster } from '@/components/ui/sonner';
 import { ServerProvidersInit } from '@/components/server-providers-init';
+import { headers } from 'next/headers';
 
 const inter = localFont({
   src: '../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2',
@@ -16,11 +17,22 @@ const inter = localFont({
   weight: '100 900',
 });
 
-export const metadata: Metadata = {
-  title: 'OpenMAIC',
-  description:
-    'The open-source AI interactive classroom. Upload a PDF to instantly generate an immersive, multi-agent learning experience.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = await headers();
+  const acceptLanguage = headersList.get('accept-language') || '';
+  const isChinese = acceptLanguage.includes('zh') || acceptLanguage.includes('CN');
+
+  return {
+    title: isChinese ? '灵犀自习室' : 'Linksy',
+    description:
+      'The open-source AI interactive classroom. Upload a PDF to instantly generate an immersive, multi-agent learning experience.',
+    icons: {
+      icon: '/logo_i.png',
+      shortcut: '/logo_i.png',
+      apple: '/logo_i.png',
+    },
+  };
+}
 
 export default function RootLayout({
   children,
