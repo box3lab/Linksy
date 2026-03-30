@@ -8,7 +8,8 @@ import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSettingsStore } from '@/lib/store/settings';
 import { useAgentRegistry } from '@/lib/orchestration/registry/store';
 import { getCurrentModelConfig } from '@/lib/utils/model-config';
-import { saveStageData } from '@/lib/utils/stage-storage';
+import { loadStageData, saveStageData } from '@/lib/utils/stage-storage';
+import type { Scene } from '@/lib/types/stage';
 import type {
   ComicPanelSpec,
   ComicSessionState,
@@ -26,6 +27,72 @@ function buildImageHeaders() {
     'x-api-key': providerConfig?.apiKey || '',
     'x-base-url': providerConfig?.baseUrl || '',
   };
+}
+
+function toComicHistoryScene(stageId: string, page: ComicGeneratedPage, now: number): Scene {
+  return {
+    id: `${stageId}_page_${page.pageIndex}`,
+    stageId,
+    type: 'interactive',
+    title: page.title,
+    order: Math.max(0, page.pageIndex - 1),
+    content: {
+      type: 'interactive',
+      url: page.imageUrl || 'about:blank',
+      html: JSON.stringify({
+        pageIndex: page.pageIndex,
+        title: page.title,
+        panels: page.panels,
+        imageUrl: page.imageUrl,
+        ttsText: page.ttsText,
+        ttsSegments: Array.isArray(page.ttsSegments)
+          ? page.ttsSegments.map((seg) => ({
+              panelIndex: seg.panelIndex,
+              speaker: seg.speaker,
+              text: seg.text,
+              voice: seg.voice,
+            }))
+          : undefined,
+      }),
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function buildPagesFromHistoryScenes(scenes: Scene[]): ComicGeneratedPage[] {
+  return [...scenes]
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((scene, idx) => {
+      if (scene.content?.type === 'interactive' && typeof scene.content.html === 'string') {
+        try {
+          const parsed = JSON.parse(scene.content.html) as Partial<ComicGeneratedPage>;
+          if (Array.isArray(parsed.panels) && parsed.panels.length > 0) {
+            return {
+              pageIndex: Number(parsed.pageIndex || idx + 1),
+              title: parsed.title || scene.title || `Page ${idx + 1}`,
+              panels: parsed.panels,
+              imageUrl: parsed.imageUrl,
+              ttsText: parsed.ttsText,
+              ttsSegments: parsed.ttsSegments,
+            } as ComicGeneratedPage;
+          }
+        } catch {
+          // fall through to minimal reconstruction
+        }
+      }
+
+      const imageUrl =
+        scene.content?.type === 'interactive' && scene.content.url !== 'about:blank'
+          ? scene.content.url
+          : undefined;
+      return {
+        pageIndex: idx + 1,
+        title: scene.title || `Page ${idx + 1}`,
+        panels: [],
+        imageUrl,
+      } as ComicGeneratedPage;
+    });
 }
 
 async function callImageApi(
@@ -158,6 +225,7 @@ function buildComicTTSSegments(
 function assignVoicesToSegments(segments: ComicTTSSegment[]): ComicTTSSegment[] {
   const settings = useSettingsStore.getState();
   const providerVoices = TTS_PROVIDERS[settings.ttsProviderId]?.voices || [];
+  const narratorNames = new Set(['旁白', 'narrator']);
   const childKeywords = [
     'child',
     'kid',
@@ -187,12 +255,35 @@ function assignVoicesToSegments(segments: ComicTTSSegment[]): ComicTTSSegment[] 
     .map((v) => v.id)
     .filter(Boolean);
 
+  const normalVoices = providerVoices
+    .map((v) => {
+      const id = String(v.id || '');
+      const name = String(v.name || '');
+      const mix = `${id} ${name}`.toLowerCase();
+      let score = 0;
+      if (!childKeywords.some((k) => mix.includes(k.toLowerCase()))) score += 3;
+      if (v.gender === 'male' || v.gender === 'neutral') score += 1;
+      return { id, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map((v) => v.id)
+    .filter(Boolean);
+
   if (voices.length === 0) return segments;
+
+  const fixedNarratorVoice =
+    settings.ttsVoice && normalVoices.includes(settings.ttsVoice)
+      ? settings.ttsVoice
+      : normalVoices[0] || settings.ttsVoice || voices[0];
 
   const speakerVoice = new Map<string, string>();
   let cursor = 0;
 
   for (const seg of segments) {
+    if (narratorNames.has(seg.speaker.trim().toLowerCase())) {
+      speakerVoice.set(seg.speaker, fixedNarratorVoice);
+      continue;
+    }
     if (!speakerVoice.has(seg.speaker)) {
       speakerVoice.set(seg.speaker, voices[cursor % voices.length]);
       cursor++;
@@ -241,16 +332,6 @@ async function callTTSApi(
   return `data:audio/${data.format};base64,${data.base64}` as string;
 }
 
-type ComicHistoryPayload = {
-  id: string;
-  savedAt: number;
-  session: ComicSessionState;
-};
-
-function getComicHistoryStorageKey(historyId: string) {
-  return `comic_history_${historyId}`;
-}
-
 function isDataUrl(url?: string) {
   return !!url && url.startsWith('data:');
 }
@@ -259,18 +340,42 @@ function sanitizePagesForHistory(pages: ComicGeneratedPage[]): ComicGeneratedPag
   return pages.map((p) => ({
     ...p,
     imageUrl: isDataUrl(p.imageUrl) ? undefined : p.imageUrl,
+    panels: p.panels.map((panel) => ({
+      ...panel,
+      prompt: '',
+    })),
+    ttsText: p.ttsText,
     ttsAudioUrl: undefined,
     ttsSegments: p.ttsSegments?.map((seg) => ({
-      ...seg,
+      panelIndex: seg.panelIndex,
+      speaker: seg.speaker,
+      text: seg.text,
+      voice: seg.voice,
       audioUrl: undefined,
     })),
+  }));
+}
+
+function sanitizePagesForSessionStorage(pages: ComicGeneratedPage[]): ComicGeneratedPage[] {
+  return pages.map((p) => ({
+    ...p,
+    imageUrl: isDataUrl(p.imageUrl) ? undefined : p.imageUrl,
+    panels: p.panels.map((panel) => ({
+      ...panel,
+      prompt: '',
+    })),
+    ttsText: undefined,
+    ttsAudioUrl: undefined,
+    ttsSegments: undefined,
   }));
 }
 
 function compactSessionForStorage(session: ComicSessionState): ComicSessionState {
   return {
     ...session,
-    pages: Array.isArray(session.pages) ? sanitizePagesForHistory(session.pages) : session.pages,
+    pages: Array.isArray(session.pages)
+      ? sanitizePagesForSessionStorage(session.pages)
+      : session.pages,
   };
 }
 
@@ -308,51 +413,66 @@ function persistComicSession(session: ComicSessionState) {
 }
 
 async function saveComicToHistory(session: ComicSessionState, pages: ComicGeneratedPage[]) {
-  if (typeof window === 'undefined') return;
-  const historyId = `comic_${session.sessionId}`;
-  const safePages = sanitizePagesForHistory(pages);
-  const historySession: ComicSessionState = {
-    ...session,
-    pages: safePages,
-    currentStep: 'complete',
-  };
-
-  const payload: ComicHistoryPayload = {
-    id: historyId,
-    savedAt: Date.now(),
-    session: historySession,
-  };
-  localStorage.setItem(getComicHistoryStorageKey(historyId), JSON.stringify(payload));
-
-  await saveStageData(historyId, {
-    stage: {
-      id: historyId,
-      name:
-        session.requirements.language === 'zh-CN'
-          ? `漫画：${session.requirements.requirement.slice(0, 30)}`
-          : `Comic: ${session.requirements.requirement.slice(0, 30)}`,
-      description:
-        session.requirements.language === 'zh-CN' ? '漫画历史记录' : 'Comic generation history',
-      language: session.requirements.language,
-      style: 'comic',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    },
-    scenes: [],
-    currentSceneId: null,
-    chats: [],
-  });
+  await upsertComicHistoryIndex(session, 'complete', pages);
 }
 
-function loadComicHistory(historyId: string): ComicHistoryPayload | null {
-  if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem(getComicHistoryStorageKey(historyId));
-  if (!raw) return null;
+async function upsertComicHistoryIndex(
+  session: ComicSessionState,
+  step: 'generating' | 'complete',
+  pages?: ComicGeneratedPage[],
+) {
+  const historyId = `comic_${session.sessionId}`;
+  const safePages = sanitizePagesForHistory(
+    pages || (Array.isArray(session.pages) ? session.pages : []),
+  );
+  const now = Date.now();
+
   try {
-    return JSON.parse(raw) as ComicHistoryPayload;
+    await saveStageData(historyId, {
+      stage: {
+        id: historyId,
+        name:
+          session.requirements.language === 'zh-CN'
+            ? `漫画：${session.requirements.requirement.slice(0, 30)}`
+            : `Comic: ${session.requirements.requirement.slice(0, 30)}`,
+        description:
+          session.requirements.language === 'zh-CN'
+            ? step === 'complete'
+              ? '漫画历史记录'
+              : '漫画生成中'
+            : step === 'complete'
+              ? 'Comic generation history'
+              : 'Comic generating',
+        language: session.requirements.language,
+        style: 'comic',
+        createdAt: now,
+        updatedAt: now,
+      },
+      scenes: safePages.map((page) => toComicHistoryScene(historyId, page, now)),
+      currentSceneId: null,
+      chats: [],
+    });
   } catch {
-    return null;
+    // Keep generation flow resilient even if IndexedDB write fails temporarily.
   }
+}
+
+async function loadComicHistoryFromStage(historyId: string): Promise<ComicSessionState | null> {
+  const data = await loadStageData(historyId);
+  if (!data?.stage) return null;
+  if (data.stage.style !== 'comic' && !historyId.startsWith('comic_')) return null;
+
+  const pages = buildPagesFromHistoryScenes(data.scenes || []);
+  return {
+    sessionId: historyId.startsWith('comic_') ? historyId.slice(6) : historyId,
+    requirements: {
+      requirement: data.stage.name || 'Comic',
+      language: data.stage.language === 'en-US' ? 'en-US' : 'zh-CN',
+    },
+    pages,
+    currentStep: 'complete',
+    agents: [],
+  };
 }
 
 export default function ComicPreviewPage() {
@@ -490,38 +610,59 @@ export default function ComicPreviewPage() {
     const modelCfg = getCurrentModelConfig();
     return !!modelCfg?.modelString;
   }, []);
+  const isHistoryMode = !!searchParams.get('historyId');
 
   useEffect(() => {
-    const historyId = searchParams.get('historyId');
-    if (historyId) {
-      const history = loadComicHistory(historyId);
-      if (history?.session) {
-        setSession(history.session);
-        const loadedPages = Array.isArray(history.session.pages) ? history.session.pages : [];
-        setPages(loadedPages);
-        setCurrentPageIndex(Math.max(0, loadedPages.length - 1));
-        setHasStopped(true);
-        setShouldAutoStart(false);
+    let cancelled = false;
+
+    const init = async () => {
+      const historyId = searchParams.get('historyId');
+      if (historyId) {
+        const stageHistory = await loadComicHistoryFromStage(historyId);
+        if (cancelled) return;
+        if (stageHistory) {
+          setSession(stageHistory);
+          const loadedPages = Array.isArray(stageHistory.pages) ? stageHistory.pages : [];
+          if (loadedPages.length > 0) {
+            setPages(loadedPages);
+            setCurrentPageIndex(0);
+            setHasStopped(true);
+          } else {
+            setError(
+              stageHistory.requirements.language === 'zh-CN'
+                ? '该漫画历史还在生成中，请稍后再试'
+                : 'This comic history is still generating. Please try again shortly.',
+            );
+          }
+          setShouldAutoStart(false);
+          return;
+        }
+      }
+
+      const raw = sessionStorage.getItem('comicSession');
+      if (!raw) {
+        if (!cancelled) setError('Missing session');
         return;
       }
-    }
-
-    const raw = sessionStorage.getItem('comicSession');
-    if (!raw) {
-      setError('Missing session');
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw) as ComicSessionState;
-      setSession(parsed);
-      if (Array.isArray(parsed.pages) && parsed.pages.length > 0) {
-        setPages(parsed.pages);
-        setCurrentPageIndex(parsed.pages.length - 1);
-        setHasStopped(parsed.currentStep === 'complete');
+      try {
+        const parsed = JSON.parse(raw) as ComicSessionState;
+        if (cancelled) return;
+        setSession(parsed);
+        if (Array.isArray(parsed.pages) && parsed.pages.length > 0) {
+          setPages(parsed.pages);
+          setCurrentPageIndex(parsed.pages.length - 1);
+          setHasStopped(parsed.currentStep === 'complete');
+        }
+      } catch {
+        if (!cancelled) setError('Invalid session');
       }
-    } catch {
-      setError('Invalid session');
-    }
+    };
+
+    void init();
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   useEffect(() => {
@@ -565,6 +706,8 @@ export default function ComicPreviewPage() {
     setHasStopped(false);
     narratedPagesRef.current.clear();
     stopNarration();
+
+    await upsertComicHistoryIndex(session, 'generating');
 
     try {
       setStatus(
@@ -713,6 +856,7 @@ export default function ComicPreviewPage() {
         };
         setSession(updatedSession);
         persistComicSession(updatedSession);
+        await upsertComicHistoryIndex(updatedSession, 'generating', generatedPages);
       }
 
       if (generatedPages.length >= maxPages) {
@@ -752,6 +896,14 @@ export default function ComicPreviewPage() {
   const canPrev = currentPageIndex > 0;
   const canNext = currentPageIndex < pages.length - 1;
   const showPreparing = pages.length === 0 && !error;
+  const subtitleText = error
+    ? error
+    : status ||
+      (isHistoryMode
+        ? ''
+        : session?.requirements.language === 'zh-CN'
+          ? 'AI 正在编排剧情与画面…'
+          : 'AI is composing story and visuals...');
   const canReplayNarration =
     !!currentPage &&
     ((Array.isArray(currentPage.ttsSegments) && currentPage.ttsSegments.length > 0) ||
@@ -810,14 +962,9 @@ export default function ComicPreviewPage() {
                     ? '漫画阅读'
                     : 'Comic Reader'}
             </h2>
-            <p className="text-slate-500 text-sm md:text-base">
-              {error
-                ? error
-                : status ||
-                  (session?.requirements.language === 'zh-CN'
-                    ? 'AI 正在编排剧情与画面…'
-                    : 'AI is composing story and visuals...')}
-            </p>
+            {subtitleText ? (
+              <p className="text-slate-500 text-sm md:text-base">{subtitleText}</p>
+            ) : null}
           </div>
 
           {/* <button
@@ -854,6 +1001,12 @@ export default function ComicPreviewPage() {
 
           {pages.length > 0 && currentPage && (
             <div className="mt-2">
+              {currentPage.title && (
+                <div className="mb-3 text-center text-xl md:text-2xl font-black text-slate-800 tracking-tight">
+                  {currentPage.title}
+                </div>
+              )}
+
               <div className="rounded-2xl border-[3px] border-slate-900/70 bg-white overflow-hidden">
                 <div className="aspect-[3/4] bg-slate-50 flex items-center justify-center relative">
                   {currentPage.imageUrl ? (
@@ -922,12 +1075,6 @@ export default function ComicPreviewPage() {
                       : 'AI generation stopped'
                     : null}
               </div>
-
-              {currentPage.title && (
-                <div className="mt-2 text-center text-sm font-black text-slate-800">
-                  {currentPage.title}
-                </div>
-              )}
             </div>
           )}
         </div>

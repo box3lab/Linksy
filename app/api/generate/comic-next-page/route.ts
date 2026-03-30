@@ -85,6 +85,8 @@ Rules:
 - This comic should be detailed and multi-page. Do NOT try to finish everything in one page.
 - Use step-by-step teaching progression across pages (concept breakdown, examples, practice, recap).
 - Each page should cover one clear sub-topic and push the learning process forward.
+- Target finishing the whole teaching storyline within 20 pages total.
+- If pageIndex is approaching 20, compress remaining points and move toward wrap-up.
 - If objective is complete, set shouldContinue=false and provide stopReason.
 - If shouldContinue=true, provide exactly one page with 5-8 panels.
 - This page will be rendered as ONE single image with dynamic manga-style layout.
