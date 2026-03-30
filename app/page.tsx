@@ -365,7 +365,13 @@ function HomePage() {
       <HomeSidebar
         sections={sidebarSections}
         locale={locale}
-        onOpenClassroom={(id) => router.push(`/classroom/${id}`)}
+        onOpenClassroom={(id) => {
+          if (id.startsWith('comic_')) {
+            router.push(`/comic-preview?historyId=${encodeURIComponent(id)}`);
+            return;
+          }
+          router.push(`/classroom/${id}`);
+        }}
         onDeleteClassroom={async (id) => {
           const confirmed = window.confirm(`${t('classroom.deleteConfirmTitle')}?`);
           if (!confirmed) return;

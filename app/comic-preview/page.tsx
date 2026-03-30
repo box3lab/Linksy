@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, Sparkles } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, ChevronLeft, ChevronRight, Loader2, RotateCcw, Sparkles } from 'lucide-react';
 import { TTS_PROVIDERS } from '@/lib/audio/constants';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useSettingsStore } from '@/lib/store/settings';
 import { useAgentRegistry } from '@/lib/orchestration/registry/store';
 import { getCurrentModelConfig } from '@/lib/utils/model-config';
+import { saveStageData } from '@/lib/utils/stage-storage';
 import type {
   ComicPanelSpec,
   ComicSessionState,
@@ -240,8 +241,123 @@ async function callTTSApi(
   return `data:audio/${data.format};base64,${data.base64}` as string;
 }
 
+type ComicHistoryPayload = {
+  id: string;
+  savedAt: number;
+  session: ComicSessionState;
+};
+
+function getComicHistoryStorageKey(historyId: string) {
+  return `comic_history_${historyId}`;
+}
+
+function isDataUrl(url?: string) {
+  return !!url && url.startsWith('data:');
+}
+
+function sanitizePagesForHistory(pages: ComicGeneratedPage[]): ComicGeneratedPage[] {
+  return pages.map((p) => ({
+    ...p,
+    imageUrl: isDataUrl(p.imageUrl) ? undefined : p.imageUrl,
+    ttsAudioUrl: undefined,
+    ttsSegments: p.ttsSegments?.map((seg) => ({
+      ...seg,
+      audioUrl: undefined,
+    })),
+  }));
+}
+
+function compactSessionForStorage(session: ComicSessionState): ComicSessionState {
+  return {
+    ...session,
+    pages: Array.isArray(session.pages) ? sanitizePagesForHistory(session.pages) : session.pages,
+  };
+}
+
+function persistComicSession(session: ComicSessionState) {
+  if (typeof window === 'undefined') return;
+
+  const compact = compactSessionForStorage(session);
+  try {
+    sessionStorage.setItem('comicSession', JSON.stringify(compact));
+    return;
+  } catch {
+    const minimal: ComicSessionState = {
+      ...compact,
+      pages: Array.isArray(compact.pages)
+        ? compact.pages.map((p) => ({
+            pageIndex: p.pageIndex,
+            title: p.title,
+            panels: p.panels.map((panel) => ({
+              index: panel.index,
+              title: panel.title,
+              prompt: '',
+              caption: panel.caption,
+              dialogue: panel.dialogue,
+              aspectRatio: panel.aspectRatio,
+            })),
+          }))
+        : compact.pages,
+    };
+    try {
+      sessionStorage.setItem('comicSession', JSON.stringify(minimal));
+    } catch {
+      sessionStorage.removeItem('comicSession');
+    }
+  }
+}
+
+async function saveComicToHistory(session: ComicSessionState, pages: ComicGeneratedPage[]) {
+  if (typeof window === 'undefined') return;
+  const historyId = `comic_${session.sessionId}`;
+  const safePages = sanitizePagesForHistory(pages);
+  const historySession: ComicSessionState = {
+    ...session,
+    pages: safePages,
+    currentStep: 'complete',
+  };
+
+  const payload: ComicHistoryPayload = {
+    id: historyId,
+    savedAt: Date.now(),
+    session: historySession,
+  };
+  localStorage.setItem(getComicHistoryStorageKey(historyId), JSON.stringify(payload));
+
+  await saveStageData(historyId, {
+    stage: {
+      id: historyId,
+      name:
+        session.requirements.language === 'zh-CN'
+          ? `漫画：${session.requirements.requirement.slice(0, 30)}`
+          : `Comic: ${session.requirements.requirement.slice(0, 30)}`,
+      description:
+        session.requirements.language === 'zh-CN' ? '漫画历史记录' : 'Comic generation history',
+      language: session.requirements.language,
+      style: 'comic',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+    scenes: [],
+    currentSceneId: null,
+    chats: [],
+  });
+}
+
+function loadComicHistory(historyId: string): ComicHistoryPayload | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(getComicHistoryStorageKey(historyId));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ComicHistoryPayload;
+  } catch {
+    return null;
+  }
+}
+
 export default function ComicPreviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useI18n();
 
   const abortRef = useRef<AbortController | null>(null);
@@ -257,6 +373,7 @@ export default function ComicPreviewPage() {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasStopped, setHasStopped] = useState(false);
+  const [shouldAutoStart, setShouldAutoStart] = useState(true);
 
   const stopNarration = useCallback(() => {
     narrationTokenRef.current += 1;
@@ -375,6 +492,20 @@ export default function ComicPreviewPage() {
   }, []);
 
   useEffect(() => {
+    const historyId = searchParams.get('historyId');
+    if (historyId) {
+      const history = loadComicHistory(historyId);
+      if (history?.session) {
+        setSession(history.session);
+        const loadedPages = Array.isArray(history.session.pages) ? history.session.pages : [];
+        setPages(loadedPages);
+        setCurrentPageIndex(Math.max(0, loadedPages.length - 1));
+        setHasStopped(true);
+        setShouldAutoStart(false);
+        return;
+      }
+    }
+
     const raw = sessionStorage.getItem('comicSession');
     if (!raw) {
       setError('Missing session');
@@ -391,7 +522,7 @@ export default function ComicPreviewPage() {
     } catch {
       setError('Invalid session');
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     return () => {
@@ -409,11 +540,11 @@ export default function ComicPreviewPage() {
   }, [currentPageIndex, pages, playNarrationForPage]);
 
   useEffect(() => {
-    if (!session || startedRef.current) return;
+    if (!session || startedRef.current || !shouldAutoStart) return;
     startedRef.current = true;
     start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, shouldAutoStart]);
 
   const start = async () => {
     if (!session) return;
@@ -451,7 +582,7 @@ export default function ComicPreviewPage() {
       });
 
       const generatedPages: ComicGeneratedPage[] = [];
-      const maxPages = 20;
+      const maxPages = 60;
 
       for (let pageIndex = 1; pageIndex <= maxPages; pageIndex++) {
         if (signal.aborted) return;
@@ -581,7 +712,7 @@ export default function ComicPreviewPage() {
           agents,
         };
         setSession(updatedSession);
-        sessionStorage.setItem('comicSession', JSON.stringify(updatedSession));
+        persistComicSession(updatedSession);
       }
 
       if (generatedPages.length >= maxPages) {
@@ -600,8 +731,15 @@ export default function ComicPreviewPage() {
         agents,
       };
       setSession(finishedSession);
-      sessionStorage.setItem('comicSession', JSON.stringify(finishedSession));
+      persistComicSession(finishedSession);
+      await saveComicToHistory(finishedSession, generatedPages);
     } catch (e) {
+      if (
+        (e instanceof DOMException && e.name === 'AbortError') ||
+        (e instanceof Error && e.message.toLowerCase().includes('signal is aborted'))
+      ) {
+        return;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
       setStatus('');
@@ -614,6 +752,10 @@ export default function ComicPreviewPage() {
   const canPrev = currentPageIndex > 0;
   const canNext = currentPageIndex < pages.length - 1;
   const showPreparing = pages.length === 0 && !error;
+  const canReplayNarration =
+    !!currentPage &&
+    ((Array.isArray(currentPage.ttsSegments) && currentPage.ttsSegments.length > 0) ||
+      !!currentPage.ttsText?.trim());
 
   return (
     <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center p-4 text-center overflow-hidden">
@@ -728,6 +870,16 @@ export default function ComicPreviewPage() {
 
               <div className="mt-3 flex items-center justify-center gap-2">
                 <button
+                  onClick={() => currentPage && void playNarrationForPage(currentPage)}
+                  disabled={!canReplayNarration}
+                  className="rounded-xl bg-sky-100 border-[3px] border-slate-900/70 px-3 py-2 text-sm font-black text-sky-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="flex items-center gap-1">
+                    <RotateCcw className="size-4" />
+                    {session?.requirements.language === 'zh-CN' ? '重播配音' : 'Replay Audio'}
+                  </span>
+                </button>
+                <button
                   onClick={() => canPrev && setCurrentPageIndex((v) => Math.max(0, v - 1))}
                   disabled={!canPrev}
                   className="rounded-xl bg-white border-[3px] border-slate-900/70 px-3 py-2 text-sm font-black text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -737,6 +889,7 @@ export default function ComicPreviewPage() {
                     {session?.requirements.language === 'zh-CN' ? '上一页' : 'Prev'}
                   </span>
                 </button>
+
                 <div className="rounded-xl bg-white border-[3px] border-slate-900/70 px-3 py-2 text-xs font-black text-slate-700">
                   {pages.length > 0
                     ? ` ${currentPageIndex + 1} / ${pages.length}`

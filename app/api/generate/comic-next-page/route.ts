@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
     const requirement = body.requirement?.trim();
     const language = body.language;
     const pageIndex = Math.max(1, Number(body.pageIndex || 1));
+    const minPagesBeforeStop = 6;
 
     if (!requirement) {
       return apiError('MISSING_REQUIRED_FIELD', 400, 'requirement is required');
@@ -81,6 +82,9 @@ ${agentContext}
 
 Rules:
 - Decide if story should continue.
+- This comic should be detailed and multi-page. Do NOT try to finish everything in one page.
+- Use step-by-step teaching progression across pages (concept breakdown, examples, practice, recap).
+- Each page should cover one clear sub-topic and push the learning process forward.
 - If objective is complete, set shouldContinue=false and provide stopReason.
 - If shouldContinue=true, provide exactly one page with 5-8 panels.
 - This page will be rendered as ONE single image with dynamic manga-style layout.
@@ -93,6 +97,7 @@ Rules:
 - Ensure dialogue appears in clear comic speech bubbles in relevant panels.
 - Avoid photorealistic style, avoid 3D rendering, avoid CGI look.
 - Use aspectRatio "3:4" for each panel.
+- For page 1 to page ${minPagesBeforeStop - 1}, MUST continue and provide a full page output.
 
 Return JSON exactly:
 {
@@ -138,8 +143,8 @@ Return JSON exactly:
       return apiError('PARSE_FAILED', 500, 'Failed to parse next comic page JSON');
     }
 
-    // Ensure first page is always generated
-    const shouldContinue = pageIndex === 1 ? true : Boolean(parsed.shouldContinue);
+    // Ensure early pages continue for detailed multi-page explanation
+    const shouldContinue = pageIndex < minPagesBeforeStop ? true : Boolean(parsed.shouldContinue);
 
     if (!shouldContinue) {
       return apiSuccess({
