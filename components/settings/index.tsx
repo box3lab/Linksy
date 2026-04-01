@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -184,19 +184,25 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
 
   // Get settings from store
   const providerId = useSettingsStore((state) => state.providerId);
-  const _modelId = useSettingsStore((state) => state.modelId);
+  const modelId = useSettingsStore((state) => state.modelId);
   const providersConfig = useSettingsStore((state) => state.providersConfig);
   const pdfProviderId = useSettingsStore((state) => state.pdfProviderId);
   const pdfProvidersConfig = useSettingsStore((state) => state.pdfProvidersConfig);
   const webSearchProviderId = useSettingsStore((state) => state.webSearchProviderId);
   const webSearchProvidersConfig = useSettingsStore((state) => state.webSearchProvidersConfig);
   const imageProviderId = useSettingsStore((state) => state.imageProviderId);
+  const imageModelId = useSettingsStore((state) => state.imageModelId);
   const imageProvidersConfig = useSettingsStore((state) => state.imageProvidersConfig);
   const videoProviderId = useSettingsStore((state) => state.videoProviderId);
+  const videoModelId = useSettingsStore((state) => state.videoModelId);
   const videoProvidersConfig = useSettingsStore((state) => state.videoProvidersConfig);
   const ttsProviderId = useSettingsStore((state) => state.ttsProviderId);
+  const ttsModelId = useSettingsStore((state) => state.ttsModelId);
+  const ttsVoice = useSettingsStore((state) => state.ttsVoice);
   const ttsProvidersConfig = useSettingsStore((state) => state.ttsProvidersConfig);
   const asrProviderId = useSettingsStore((state) => state.asrProviderId);
+  const asrModelId = useSettingsStore((state) => state.asrModelId);
+  const asrLanguage = useSettingsStore((state) => state.asrLanguage);
   const asrProvidersConfig = useSettingsStore((state) => state.asrProvidersConfig);
 
   // Store actions
@@ -327,6 +333,82 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
         models: providersConfig[selectedProviderId].models,
       }
     : undefined;
+
+  const debugModelState = useMemo(() => {
+    const summarizeConfig = (config?: {
+      apiKey?: string;
+      baseUrl?: string;
+      isServerConfigured?: boolean;
+      serverBaseUrl?: string;
+    }) => ({
+      hasApiKey: !!config?.apiKey,
+      baseUrl: config?.baseUrl || '',
+      isServerConfigured: !!config?.isServerConfigured,
+      serverBaseUrl: config?.serverBaseUrl || '',
+    });
+
+    return {
+      activeSection,
+      llm: {
+        providerId,
+        modelId,
+        ...summarizeConfig(providersConfig[providerId]),
+      },
+      tts: {
+        providerId: ttsProviderId,
+        modelId: ttsModelId,
+        voice: ttsVoice,
+        ...summarizeConfig(ttsProvidersConfig[ttsProviderId]),
+      },
+      asr: {
+        providerId: asrProviderId,
+        modelId: asrModelId,
+        language: asrLanguage,
+        ...summarizeConfig(asrProvidersConfig[asrProviderId]),
+      },
+      image: {
+        providerId: imageProviderId,
+        modelId: imageModelId,
+        ...summarizeConfig(imageProvidersConfig[imageProviderId]),
+      },
+      video: {
+        providerId: videoProviderId,
+        modelId: videoModelId,
+        ...summarizeConfig(videoProvidersConfig[videoProviderId]),
+      },
+      pdf: {
+        providerId: pdfProviderId,
+        ...summarizeConfig(pdfProvidersConfig[pdfProviderId]),
+      },
+      webSearch: {
+        providerId: webSearchProviderId,
+        ...summarizeConfig(webSearchProvidersConfig[webSearchProviderId]),
+      },
+    };
+  }, [
+    activeSection,
+    providerId,
+    modelId,
+    providersConfig,
+    ttsProviderId,
+    ttsModelId,
+    ttsVoice,
+    ttsProvidersConfig,
+    asrProviderId,
+    asrModelId,
+    asrLanguage,
+    asrProvidersConfig,
+    imageProviderId,
+    imageModelId,
+    imageProvidersConfig,
+    videoProviderId,
+    videoModelId,
+    videoProvidersConfig,
+    pdfProviderId,
+    pdfProvidersConfig,
+    webSearchProviderId,
+    webSearchProvidersConfig,
+  ]);
 
   // Handle model editing
   const handleEditModel = (pid: ProviderId, modelIndex: number) => {
@@ -994,6 +1076,17 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
               )}
               {activeSection === 'tts' && <TTSSettings selectedProviderId={ttsProviderId} />}
               {activeSection === 'asr' && <ASRSettings selectedProviderId={asrProviderId} />}
+
+              {activeSection === 'general' && (
+                <details className="mt-6 rounded-lg border border-dashed border-border/80 bg-muted/20 p-3">
+                  <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground">
+                    Debug · Current Model State
+                  </summary>
+                  <pre className="mt-2 max-h-64 overflow-auto rounded bg-background p-3 text-[11px] leading-5 text-foreground/90">
+                    {JSON.stringify(debugModelState, null, 2)}
+                  </pre>
+                </details>
+              )}
             </div>
 
             {/* Footer */}
