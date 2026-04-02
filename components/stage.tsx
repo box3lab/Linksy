@@ -104,6 +104,9 @@ export function Stage({
 
   // Active bubble ID for playback highlight in chat area (Issue 8)
   const [activeBubbleId, setActiveBubbleId] = useState<string | null>(null);
+  const [dismissedTeacherDialogSignature, setDismissedTeacherDialogSignature] = useState<
+    string | null
+  >(null);
 
   // Scene switch confirmation dialog state
   const [pendingSceneId, setPendingSceneId] = useState<string | null>(null);
@@ -751,6 +754,7 @@ export function Stage({
 
     if (isCueUser) {
       return {
+        role: 'user' as const,
         name: t('roundtable.you'),
         text: t('roundtable.yourTurn'),
         side: 'right' as const,
@@ -760,6 +764,7 @@ export function Stage({
 
     if (thinkingState?.stage === 'director') {
       return {
+        role: 'teacher' as const,
         name: teacher?.name || t('roundtable.teacher'),
         text: t('roundtable.thinking'),
         side: 'left' as const,
@@ -772,6 +777,7 @@ export function Stage({
 
     if (playbackView.bubbleRole === 'agent') {
       return {
+        role: 'agent' as const,
         name: speakingParticipant?.name || t('settings.agentRoles.student'),
         text,
         side: 'right' as const,
@@ -781,6 +787,7 @@ export function Stage({
 
     if (playbackView.bubbleRole === 'user') {
       return {
+        role: 'user' as const,
         name: t('roundtable.you'),
         text,
         side: 'right' as const,
@@ -789,6 +796,7 @@ export function Stage({
     }
 
     return {
+      role: 'teacher' as const,
       name: teacher?.name || t('roundtable.teacher'),
       text,
       side: 'left' as const,
@@ -804,6 +812,14 @@ export function Stage({
     playbackView.bubbleRole,
     t,
   ]);
+
+  const teacherDialogSignature = useMemo(() => {
+    if (!speakerDisplay || speakerDisplay.role !== 'teacher') return null;
+    return `${speakerDisplay.name}:${speakerDisplay.text}`;
+  }, [speakerDisplay]);
+
+  const teacherDialogVisible =
+    !teacherDialogSignature || dismissedTeacherDialogSignature !== teacherDialogSignature;
 
   const renderAvatar = (avatar: string | undefined, name: string) => {
     if (!avatar) {
@@ -840,11 +856,11 @@ export function Stage({
           }}
           suppressHydrationWarning
         >
-            <CanvasArea
-              currentScene={currentScene}
-              currentSceneIndex={currentSceneIndex}
-              scenesCount={totalScenesCount}
-              mode={mode}
+          <CanvasArea
+            currentScene={currentScene}
+            currentSceneIndex={currentSceneIndex}
+            scenesCount={totalScenesCount}
+            mode={mode}
             engineState={canvasEngineState}
             isLiveSession={
               chatIsStreaming || isTopicPending || engineMode === 'live' || !!chatSessionType
@@ -874,25 +890,25 @@ export function Stage({
             onCycleSpeed={handleCycleSpeed}
             hideToolbar={false}
             isPendingScene={isPendingScene}
-              isGenerationFailed={
-                isPendingScene && failedOutlines.some((f) => f.id === generatingOutlines[0]?.id)
-              }
-              onRetryGeneration={
-                onRetryOutline && generatingOutlines[0]
-                  ? () => onRetryOutline(generatingOutlines[0].id)
-                  : undefined
-              }
-              studentParticipants={studentParticipants}
-            />
+            isGenerationFailed={
+              isPendingScene && failedOutlines.some((f) => f.id === generatingOutlines[0]?.id)
+            }
+            onRetryGeneration={
+              onRetryOutline && generatingOutlines[0]
+                ? () => onRetryOutline(generatingOutlines[0].id)
+                : undefined
+            }
+            studentParticipants={studentParticipants}
+          />
 
-          {mode === 'playback' && speakerDisplay && (
+          {mode === 'playback' && speakerDisplay && teacherDialogVisible && (
             <div
               className={`absolute bottom-11 left-4 right-4 z-[140] pointer-events-none flex ${
                 speakerDisplay.side === 'left' ? 'justify-start' : 'justify-end'
               }`}
             >
               <div
-                className={`max-w-[74%] rounded-2xl border-[4px] border-slate-900/80 bg-white/96 px-3 py-2 flex items-start gap-2 shadow-[0_2px_0_rgba(15,23,42,0.18)] ${
+                className={`pointer-events-auto max-w-[74%] rounded-2xl border-[4px] border-slate-900/80 bg-white/96 px-3 py-2 flex items-start gap-2 shadow-[0_2px_0_rgba(15,23,42,0.18)] ${
                   speakerDisplay.side === 'left'
                     ? 'rounded-bl-md border-sky-500/80'
                     : 'rounded-br-md border-orange-500/80'
@@ -917,6 +933,16 @@ export function Stage({
                     {speakerDisplay.text}
                   </p>
                 </div>
+                {speakerDisplay.role === 'teacher' && teacherDialogSignature && (
+                  <button
+                    type="button"
+                    onClick={() => setDismissedTeacherDialogSignature(teacherDialogSignature)}
+                    aria-label="Close"
+                    className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200/70 hover:text-slate-800"
+                  >
+                    <span aria-hidden>×</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

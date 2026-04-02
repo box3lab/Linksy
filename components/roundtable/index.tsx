@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, MicOff, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAudioRecorder } from '@/lib/hooks/use-audio-recorder';
@@ -110,30 +110,31 @@ export function Roundtable({
   const [isSendCooldown, setIsSendCooldown] = useState(false);
   const isSendCooldownRef = useRef(false);
 
-  const { isRecording, isProcessing, startRecording, stopRecording } = useAudioRecorder({
-    onTranscription: (text) => {
-      if (!text.trim()) {
-        toast.info(t('roundtable.noSpeechDetected'));
+  const { isRecording, isProcessing, recordingTime, startRecording, stopRecording } =
+    useAudioRecorder({
+      onTranscription: (text) => {
+        if (!text.trim()) {
+          toast.info(t('roundtable.noSpeechDetected'));
+          setIsVoiceOpen(false);
+          return;
+        }
+        if (isSendCooldownRef.current) {
+          setIsVoiceOpen(false);
+          return;
+        }
+        onMessageSend?.(text);
+        setIsSendCooldown(true);
+        isSendCooldownRef.current = true;
         setIsVoiceOpen(false);
-        return;
-      }
-      if (isSendCooldownRef.current) {
-        setIsVoiceOpen(false);
-        return;
-      }
-      onMessageSend?.(text);
-      setIsSendCooldown(true);
-      isSendCooldownRef.current = true;
-      setIsVoiceOpen(false);
-      setTimeout(() => {
-        setIsSendCooldown(false);
-        isSendCooldownRef.current = false;
-      }, 1200);
-    },
-    onError: (error) => {
-      toast.error(error);
-    },
-  });
+        setTimeout(() => {
+          setIsSendCooldown(false);
+          isSendCooldownRef.current = false;
+        }, 1200);
+      },
+      onError: (error) => {
+        toast.error(error);
+      },
+    });
 
   const handleSendMessage = () => {
     if (!inputValue.trim() || isSendCooldown) return;
@@ -159,6 +160,45 @@ export function Roundtable({
     startRecording();
   };
 
+  const prevRecordingRef = useRef(false);
+
+  const playRecordingCue = (type: 'start' | 'stop') => {
+    if (typeof window === 'undefined') return;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    oscillator.type = 'sine';
+    oscillator.frequency.value = type === 'start' ? 860 : 540;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.06, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+    oscillator.start(now);
+    oscillator.stop(now + 0.12);
+    oscillator.onended = () => void ctx.close();
+  };
+
+  useEffect(() => {
+    if (isRecording && !prevRecordingRef.current) {
+      playRecordingCue('start');
+    }
+    if (!isRecording && prevRecordingRef.current) {
+      playRecordingCue('stop');
+    }
+    prevRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  const recordingTimeLabel = `${Math.floor(recordingTime / 60)
+    .toString()
+    .padStart(2, '0')}:${(recordingTime % 60).toString().padStart(2, '0')}`;
+
   return (
     <div className="h-[80px] w-full relative z-10 border-t-[5px] border-slate-900/90 bg-[#ffd449]">
       <div className="h-full px-3.5 flex items-center gap-2.5">
@@ -169,7 +209,7 @@ export function Roundtable({
           }}
           disabled={!asrEnabled || isSendCooldown}
           className={cn(
-            'shrink-0 w-10 h-10 rounded-xl border-[5px] border-slate-900/85 flex items-center justify-center transition-all active:scale-95',
+            'relative shrink-0 w-10 h-10 rounded-xl border-[5px] border-slate-900/85 flex items-center justify-center transition-all active:scale-95',
             !asrEnabled || isSendCooldown
               ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
               : isVoiceOpen
@@ -177,6 +217,15 @@ export function Roundtable({
                 : 'bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-600',
           )}
         >
+          {isRecording && (
+            <>
+              <span className="pointer-events-none absolute inset-[-7px] rounded-2xl border-2 border-orange-500/70 animate-ping" />
+              <span
+                className="pointer-events-none absolute inset-[-11px] rounded-[18px] border-2 border-orange-400/45"
+                style={{ animation: 'recording-ripple 1.7s ease-out infinite' }}
+              />
+            </>
+          )}
           {asrEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
         </button>
 
@@ -227,11 +276,48 @@ export function Roundtable({
         </button>
       </div>
 
-      {isVoiceOpen && (
-        <div className="absolute right-3.5 -top-7 rounded-full border-[4px] border-slate-900/75 bg-white px-2.5 py-1 text-[11px] font-bold text-orange-600">
-          {isProcessing ? t('roundtable.processing') : t('roundtable.listening')}
+      {(isRecording || isProcessing) && (
+        <div className="fixed inset-0 z-[220] pointer-events-none flex items-center justify-center">
+          <div className="relative rounded-2xl border-[5px] border-slate-900/85 bg-white/95 px-6 py-4 shadow-[0_10px_0_rgba(15,23,42,0.2)]">
+            {isRecording && (
+              <>
+                <span className="absolute inset-[-10px] rounded-[22px] border-2 border-orange-400/40 animate-ping" />
+                <span
+                  className="absolute inset-[-16px] rounded-[26px] border-2 border-orange-400/30"
+                  style={{ animation: 'recording-ripple 1.8s ease-out infinite' }}
+                />
+              </>
+            )}
+            <div className="relative z-10 flex items-center gap-3 text-slate-800">
+              <span
+                className={cn(
+                  'h-3 w-3 rounded-full',
+                  isRecording ? 'bg-orange-500 animate-pulse' : 'bg-slate-400',
+                )}
+              />
+              <span className="tabular-nums text-2xl font-black tracking-wide text-orange-600">
+                {recordingTimeLabel}
+              </span>
+              <span className="text-base font-bold">
+                {isProcessing ? t('roundtable.processing') : t('roundtable.listening')}
+              </span>
+            </div>
+          </div>
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes recording-ripple {
+          0% {
+            opacity: 0.65;
+            transform: scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: scale(1.16);
+          }
+        }
+      `}</style>
     </div>
   );
 }
