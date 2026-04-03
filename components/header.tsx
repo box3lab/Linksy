@@ -71,7 +71,7 @@ export function Header({
           {onTogglePresentation && (
             <button
               onClick={onTogglePresentation}
-              className="h-10 w-10 rounded-full border-[4px] border-slate-900 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition-all flex items-center justify-center"
+              className="h-10 w-10 rounded-full border-[4px] border-slate-900 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition-all flex items-center justify-center shrink-0"
               aria-label={isPresenting ? t('stage.exitFullscreen') : t('stage.fullscreen')}
               title={isPresenting ? t('stage.exitFullscreen') : t('stage.fullscreen')}
             >
@@ -95,7 +95,7 @@ export function Header({
                 : t('share.notReady')
             }
             className={cn(
-              'shrink-0 h-10 px-3 rounded-full border-[4px] border-slate-900 transition-all flex items-center justify-center bg-white',
+              'shrink-0 h-10 w-10 rounded-full border-[4px] border-slate-900 transition-all flex items-center justify-center bg-white',
               canExport && !isExporting
                 ? 'text-slate-600 hover:bg-sky-50 hover:text-sky-700'
                 : 'text-slate-300 cursor-not-allowed opacity-50 bg-slate-100',
