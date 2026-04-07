@@ -100,6 +100,28 @@
     "older": "Earlier",
     "empty": "No classroom history yet."
   },
+  "auth": {
+    "titleLogin": "Login",
+    "titleRegister": "Create account",
+    "backHome": "Back home",
+    "envMissing": "Supabase environment variables are missing. Please configure them before using authentication.",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "confirmPasswordLabel": "Confirm password",
+    "switchToRegister": "Don't have an account?",
+    "switchToLogin": "Already have an account?",
+    "registerTab": "Register",
+    "loginTab": "Login",
+    "submitLogin": "Login",
+    "submitRegister": "Register",
+    "submitting": "Submitting...",
+    "toastEnvMissing": "Authentication service is not configured",
+    "toastEmailPasswordRequired": "Email and password are required",
+    "toastPasswordMismatch": "Passwords do not match",
+    "toastRegisterSuccess": "Registration successful. Please sign in.",
+    "toastLoginSuccess": "Login successful",
+    "toastAuthFailed": "Authentication failed"
+  },
   "toolbar": {
     "languageHint": "Course will be generated in this language",
     "pdfParser": "Parser",

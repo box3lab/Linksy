@@ -8,8 +8,7 @@ import { db } from '@/lib/utils/database';
 import type { SceneOutline, PdfImage, ImageMapping } from '@/lib/types/generation';
 import type { AgentInfo } from '@/lib/generation/generation-pipeline';
 import type { Scene } from '@/lib/types/stage';
-import type { Action, SpeechAction } from '@/lib/types/action';
-import type { TTSProviderId } from '@/lib/audio/types';
+import type { SpeechAction } from '@/lib/types/action';
 import { splitLongSpeechActions } from '@/lib/audio/tts-utils';
 import { generateMediaForOutlines } from '@/lib/media/media-orchestrator';
 import { createLogger } from '@/lib/logger';
@@ -21,6 +20,8 @@ interface SceneContentResult {
   content?: unknown;
   effectiveOutline?: SceneOutline;
   error?: string;
+  statusCode?: number;
+  errorPayload?: unknown;
 }
 
 interface SceneActionsResult {
@@ -28,6 +29,20 @@ interface SceneActionsResult {
   scene?: Scene;
   previousSpeeches?: string[];
   error?: string;
+  statusCode?: number;
+  errorPayload?: unknown;
+}
+
+type LogLevel = 'INFO' | 'WARN' | 'ERROR';
+
+function stringifyErrorPayload(payload: unknown): string {
+  if (!payload) return '';
+  try {
+    const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    return raw.length > 1200 ? `${raw.slice(0, 1200)}...` : raw;
+  } catch {
+    return String(payload);
+  }
 }
 
 function getApiHeaders(): HeadersInit {
@@ -86,10 +101,16 @@ async function fetchSceneContent(
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({ error: 'Request failed' }));
-    return { success: false, error: data.error || `HTTP ${response.status}` };
+    return {
+      success: false,
+      error: data.error || `HTTP ${response.status}`,
+      statusCode: response.status,
+      errorPayload: data,
+    };
   }
 
-  return response.json();
+  const data = (await response.json()) as SceneContentResult;
+  return { ...data, statusCode: response.status };
 }
 
 /** Call POST /api/generate/scene-actions (step 2) */
@@ -114,10 +135,16 @@ async function fetchSceneActions(
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({ error: 'Request failed' }));
-    return { success: false, error: data.error || `HTTP ${response.status}` };
+    return {
+      success: false,
+      error: data.error || `HTTP ${response.status}`,
+      statusCode: response.status,
+      errorPayload: data,
+    };
   }
 
-  return response.json();
+  const data = (await response.json()) as SceneActionsResult;
+  return { ...data, statusCode: response.status };
 }
 
 /** Generate TTS for one speech action and store in IndexedDB */
@@ -215,6 +242,13 @@ export interface UseSceneGeneratorOptions {
   onSceneFailed?: (outline: SceneOutline, error: string) => void;
   onPhaseChange?: (phase: 'content' | 'actions', outline: SceneOutline) => void;
   onComplete?: () => void;
+  onLog?: (scope: string, message: string, level?: LogLevel) => void;
+  onApiTiming?: (
+    method: 'GET' | 'POST',
+    path: string,
+    status: number | 'ERR',
+    durationMs: number,
+  ) => void;
 }
 
 export interface GenerationParams {
@@ -312,6 +346,7 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
 
           // Step 1: Generate content
           options.onPhaseChange?.('content', outline);
+          const contentStart = performance.now();
           const contentResult = await fetchSceneContent(
             {
               outline,
@@ -324,8 +359,21 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
             },
             signal,
           );
+          options.onApiTiming?.(
+            'POST',
+            '/api/generate/scene-content',
+            contentResult.statusCode ?? (contentResult.success ? 200 : 'ERR'),
+            performance.now() - contentStart,
+          );
 
           if (!contentResult.success || !contentResult.content) {
+            if (contentResult.errorPayload) {
+              options.onLog?.(
+                'Scene Content API',
+                `Scene content error payload: ${stringifyErrorPayload(contentResult.errorPayload)}`,
+                'ERROR',
+              );
+            }
             if (abortRef.current || store.getState().generationEpoch !== startEpoch) {
               pausedByFailureOrAbort = true;
               break;
@@ -345,6 +393,7 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
 
           // Step 2: Generate actions + assemble scene
           options.onPhaseChange?.('actions', outline);
+          const actionsStart = performance.now();
           const actionsResult = await fetchSceneActions(
             {
               outline: contentResult.effectiveOutline || outline,
@@ -357,6 +406,12 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
             },
             signal,
           );
+          options.onApiTiming?.(
+            'POST',
+            '/api/generate/scene-actions',
+            actionsResult.statusCode ?? (actionsResult.success ? 200 : 'ERR'),
+            performance.now() - actionsStart,
+          );
 
           if (actionsResult.success && actionsResult.scene) {
             const scene = actionsResult.scene;
@@ -366,6 +421,11 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
             if (settings.ttsEnabled && settings.ttsProviderId !== 'browser-native-tts') {
               const ttsResult = await generateTTSForScene(scene, signal);
               if (!ttsResult.success) {
+                options.onLog?.(
+                  'TTS API',
+                  `TTS generation failed: ${ttsResult.error || 'Unknown error'}`,
+                  'ERROR',
+                );
                 if (abortRef.current || store.getState().generationEpoch !== startEpoch) {
                   pausedByFailureOrAbort = true;
                   break;
@@ -389,6 +449,13 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
             options.onSceneGenerated?.(scene, outline.order);
             previousSpeeches = actionsResult.previousSpeeches || [];
           } else {
+            if (actionsResult.errorPayload) {
+              options.onLog?.(
+                'Scene Actions API',
+                `Scene actions error payload: ${stringifyErrorPayload(actionsResult.errorPayload)}`,
+                'ERROR',
+              );
+            }
             if (abortRef.current || store.getState().generationEpoch !== startEpoch) {
               pausedByFailureOrAbort = true;
               break;

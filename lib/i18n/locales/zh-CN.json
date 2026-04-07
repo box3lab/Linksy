@@ -100,6 +100,28 @@
     "older": "更早",
     "empty": "还没有课堂记录。"
   },
+  "auth": {
+    "titleLogin": "登录",
+    "titleRegister": "注册账号",
+    "backHome": "返回首页",
+    "envMissing": "Supabase 环境变量缺失，请先完成配置后再使用登录功能。",
+    "emailLabel": "邮箱",
+    "passwordLabel": "密码",
+    "confirmPasswordLabel": "确认密码",
+    "switchToRegister": "还没有账号？",
+    "switchToLogin": "已经有账号了？",
+    "registerTab": "去注册",
+    "loginTab": "去登录",
+    "submitLogin": "登录",
+    "submitRegister": "注册",
+    "submitting": "提交中...",
+    "toastEnvMissing": "认证服务尚未配置",
+    "toastEmailPasswordRequired": "请输入邮箱和密码",
+    "toastPasswordMismatch": "两次输入的密码不一致",
+    "toastRegisterSuccess": "注册成功，请登录",
+    "toastLoginSuccess": "登录成功",
+    "toastAuthFailed": "认证失败"
+  },
   "toolbar": {
     "languageHint": "课程将以此语言生成",
     "pdfParser": "解析器",

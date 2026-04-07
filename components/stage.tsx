@@ -41,8 +41,14 @@ import { VisuallyHidden } from 'radix-ui';
  */
 export function Stage({
   onRetryOutline,
+  showLogsToggle,
+  logsVisible,
+  onToggleLogs,
 }: {
   onRetryOutline?: (outlineId: string) => Promise<void>;
+  showLogsToggle?: boolean;
+  logsVisible?: boolean;
+  onToggleLogs?: () => void;
 }) {
   const { t } = useI18n();
   const { mode, getCurrentScene, scenes, currentSceneId, setCurrentSceneId, generatingOutlines } =
@@ -978,6 +984,9 @@ export function Stage({
           currentSceneTitle={currentScene?.title || ''}
           isPresenting={isPresenting}
           onTogglePresentation={handleTogglePresentation}
+          showLogsToggle={showLogsToggle}
+          logsVisible={logsVisible}
+          onToggleLogs={onToggleLogs}
         />
 
         {/* Canvas Area */}

@@ -100,6 +100,28 @@
     "older": "それ以前",
     "empty": "教室履歴はまだありません。"
   },
+  "auth": {
+    "titleLogin": "ログイン",
+    "titleRegister": "アカウント登録",
+    "backHome": "ホームへ戻る",
+    "envMissing": "Supabase の環境変数が不足しています。認証を使う前に設定してください。",
+    "emailLabel": "メールアドレス",
+    "passwordLabel": "パスワード",
+    "confirmPasswordLabel": "パスワード確認",
+    "switchToRegister": "アカウントをお持ちでないですか？",
+    "switchToLogin": "すでにアカウントをお持ちですか？",
+    "registerTab": "登録",
+    "loginTab": "ログイン",
+    "submitLogin": "ログイン",
+    "submitRegister": "登録",
+    "submitting": "送信中...",
+    "toastEnvMissing": "認証サービスが設定されていません",
+    "toastEmailPasswordRequired": "メールアドレスとパスワードを入力してください",
+    "toastPasswordMismatch": "パスワードが一致しません",
+    "toastRegisterSuccess": "登録が完了しました。ログインしてください。",
+    "toastLoginSuccess": "ログインしました",
+    "toastAuthFailed": "認証に失敗しました"
+  },
   "toolbar": {
     "languageHint": "コースはこの言語で生成されます",
     "pdfParser": "パーサー",

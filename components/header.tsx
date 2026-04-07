@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, Download, FileDown, Maximize2, Minimize2, Package } from 'lucide-react';
+import { Loader2, Download, FileDown, Maximize2, Minimize2, Package, List } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -12,12 +12,18 @@ interface HeaderProps {
   readonly currentSceneTitle: string;
   readonly isPresenting?: boolean;
   readonly onTogglePresentation?: () => void;
+  readonly showLogsToggle?: boolean;
+  readonly logsVisible?: boolean;
+  readonly onToggleLogs?: () => void;
 }
 
 export function Header({
   currentSceneTitle,
   isPresenting = false,
   onTogglePresentation,
+  showLogsToggle = false,
+  logsVisible = false,
+  onToggleLogs,
 }: HeaderProps) {
   const { t } = useI18n();
 
@@ -67,17 +73,39 @@ export function Header({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-1 py-1 shrink-0">
-          {onTogglePresentation && (
-            <button
-              onClick={onTogglePresentation}
-              className="h-10 w-10 rounded-full border-[4px] border-slate-900 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition-all flex items-center justify-center shrink-0"
-              aria-label={isPresenting ? t('stage.exitFullscreen') : t('stage.fullscreen')}
-              title={isPresenting ? t('stage.exitFullscreen') : t('stage.fullscreen')}
-            >
-              {isPresenting ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-          )}
+        <div className="shrink-0 px-0.5 py-0.5">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {showLogsToggle && onToggleLogs && (
+              <button
+                onClick={onToggleLogs}
+                className={cn(
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-[3px] transition-all sm:h-10 sm:w-10 sm:border-[4px]',
+                  logsVisible
+                    ? 'border-sky-500 bg-sky-100 text-sky-700'
+                    : 'border-slate-900 bg-white text-slate-700 hover:bg-sky-50 hover:text-sky-700',
+                )}
+                aria-label="Toggle classroom logs"
+                title="Toggle classroom logs"
+              >
+                <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </button>
+            )}
+
+            {onTogglePresentation && (
+              <button
+                onClick={onTogglePresentation}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-[3px] border-slate-900 bg-white text-slate-700 transition-all hover:bg-sky-50 hover:text-sky-700 sm:h-10 sm:w-10 sm:border-[4px]"
+                aria-label={isPresenting ? t('stage.exitFullscreen') : t('stage.fullscreen')}
+                title={isPresenting ? t('stage.exitFullscreen') : t('stage.fullscreen')}
+              >
+                {isPresenting ? (
+                  <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Export Dropdown */}
