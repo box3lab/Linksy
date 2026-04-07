@@ -732,6 +732,118 @@ export function Stage({
     setWhiteboardOpen(!whiteboardOpen);
   };
 
+  const isPresentationShortcutTarget = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+
+    if (target.isContentEditable || target.closest('[contenteditable="true"]')) {
+      return true;
+    }
+
+    return (
+      target.closest(
+        ['input', 'textarea', 'select', '[role="slider"]', 'input[type="range"]'].join(', '),
+      ) !== null
+    );
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      // Let modifier-key combos (Ctrl+C, Ctrl+S, etc.) pass through to the browser
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (
+        isPresentationShortcutTarget(event.target) ||
+        isPresentationShortcutTarget(document.activeElement)
+      ) {
+        return;
+      }
+
+      switch (event.key) {
+        case 'ArrowLeft':
+          if (!isPresenting) return;
+          event.preventDefault();
+          handlePreviousScene();
+          break;
+        case 'ArrowRight':
+          if (!isPresenting) return;
+          event.preventDefault();
+          handleNextScene();
+          break;
+        case ' ':
+        case 'Spacebar':
+          // During active QA/discussion, Roundtable owns Space for
+          // buffer-level pause/resume — don't also fire engine play/pause.
+          if (chatSessionType === 'qa' || chatSessionType === 'discussion') break;
+          event.preventDefault();
+          handlePlayPause();
+          break;
+        case 'Escape':
+          if (isPresenting) {
+            event.preventDefault();
+            void handleTogglePresentation();
+          }
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          setTTSVolume(ttsVolume + 0.1);
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          setTTSVolume(ttsVolume - 0.1);
+          break;
+        case 'm':
+        case 'M':
+          event.preventDefault();
+          setTTSMuted(!ttsMuted);
+          break;
+        case 's':
+        case 'S':
+          event.preventDefault();
+          setSidebarCollapsed(!sidebarCollapsed);
+          break;
+        case 'c':
+        case 'C':
+          event.preventDefault();
+          setChatAreaCollapsed(!chatAreaCollapsed);
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    chatSessionType,
+    chatAreaCollapsed,
+    handleNextScene,
+    handlePlayPause,
+    handlePreviousScene,
+    isPresenting,
+    isPresentationShortcutTarget,
+    setChatAreaCollapsed,
+    setSidebarCollapsed,
+    setTTSMuted,
+    setTTSVolume,
+    sidebarCollapsed,
+    handleTogglePresentation,
+    ttsMuted,
+    ttsVolume,
+  ]);
+
+  // Intercept F11 to use our presentation fullscreen instead of browser fullscreen
+  // This way ESC can exit fullscreen (browser F11 fullscreen requires F11 to exit)
+  useEffect(() => {
+    const onF11 = (event: KeyboardEvent) => {
+      if (event.key === 'F11') {
+        event.preventDefault();
+        void handleTogglePresentation();
+      }
+    };
+
+    window.addEventListener('keydown', onF11);
+    return () => window.removeEventListener('keydown', onF11);
+  }, [handleTogglePresentation]);
   // Map engine mode to the CanvasArea's expected engine state
   const canvasEngineState = (() => {
     switch (engineMode) {
