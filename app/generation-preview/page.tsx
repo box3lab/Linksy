@@ -1,9 +1,18 @@
 'use client';
 
-import { useEffect, useState, Suspense, useRef } from 'react';
+import { useCallback, useEffect, useState, Suspense, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, Sparkles, AlertCircle, AlertTriangle, ArrowLeft, Bot } from 'lucide-react';
+import {
+  CheckCircle2,
+  Sparkles,
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  Bot,
+  Copy,
+  Check,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -46,6 +55,8 @@ function GenerationPreviewContent() {
   const [statusMessage, setStatusMessage] = useState('');
   const [streamingOutlines, setStreamingOutlines] = useState<SceneOutline[] | null>(null);
   const [truncationWarnings, setTruncationWarnings] = useState<string[]>([]);
+  const [generationLogs, setGenerationLogs] = useState<string[]>([]);
+  const [copiedLogs, setCopiedLogs] = useState(false);
   const [webSearchSources, setWebSearchSources] = useState<Array<{ title: string; url: string }>>(
     [],
   );
@@ -62,6 +73,153 @@ function GenerationPreviewContent() {
     }>
   >([]);
   const agentRevealResolveRef = useRef<(() => void) | null>(null);
+
+  const pushGenerationLog = useCallback(
+    (scope: string, message: string, level: 'INFO' | 'WARN' | 'ERROR' = 'INFO') => {
+      const timestamp = new Date().toISOString();
+      setGenerationLogs((prev) => {
+        const next = [`[${timestamp}] [${level}] [${scope}] ${message}`, ...prev];
+        return next.slice(0, 150);
+      });
+    },
+    [],
+  );
+
+  const formatDuration = useCallback((durationMs: number) => {
+    if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+    return `${(durationMs / 1000).toFixed(1)}s`;
+  }, []);
+
+  const pushNextApiLine = useCallback(
+    (method: 'GET' | 'POST', path: string, status: number | 'ERR', durationMs: number) => {
+      const renderDuration = formatDuration(durationMs);
+      setGenerationLogs((prev) => {
+        const next = [
+          `${method} ${path} ${status} in ${renderDuration} (compile: n/a, render: ${renderDuration})`,
+          ...prev,
+        ];
+        return next.slice(0, 150);
+      });
+    },
+    [formatDuration],
+  );
+
+  const stringifyErrorPayload = useCallback((payload: unknown) => {
+    if (!payload) return '';
+    try {
+      const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
+      return raw.length > 1200 ? `${raw.slice(0, 1200)}...` : raw;
+    } catch {
+      return String(payload);
+    }
+  }, []);
+
+  const handleCopyLogs = useCallback(async () => {
+    if (!generationLogs.length) return;
+    try {
+      await navigator.clipboard.writeText(generationLogs.join('\n'));
+      setCopiedLogs(true);
+      setTimeout(() => setCopiedLogs(false), 1500);
+    } catch {
+      setCopiedLogs(false);
+    }
+  }, [generationLogs]);
+
+  const renderTokenizedText = useCallback((line: string) => {
+    const tokenRegex =
+      /(\b(?:200|201|204|400|401|403|404|429|500|502|503|ERR)\b|\b(?:INFO|WARN|ERROR|POST|GET|failed|error|warning)\b)/gi;
+
+    return line.split(tokenRegex).map((chunk, idx) => {
+      if (!chunk) return null;
+      const token = chunk.toLowerCase();
+
+      let cls = '';
+      if (/^20\d$/.test(chunk)) cls = 'text-emerald-700 font-semibold';
+      else if (/^[45]\d\d$/.test(chunk) || token === 'err') cls = 'text-red-600 font-semibold';
+      else if (token === 'error' || token === 'failed') cls = 'text-red-600 font-semibold';
+      else if (token === 'warn' || token === 'warning') cls = 'text-amber-600 font-semibold';
+      else if (token === 'info') cls = 'text-sky-700 font-semibold';
+      else if (token === 'post' || token === 'get') cls = 'text-violet-700 font-semibold';
+
+      return (
+        <span key={`${chunk}-${idx}`} className={cls}>
+          {chunk}
+        </span>
+      );
+    });
+  }, []);
+
+  const renderJsonSegment = useCallback((jsonText: string) => {
+    let pretty = jsonText;
+    try {
+      const parsed = JSON.parse(jsonText);
+      pretty = JSON.stringify(parsed, null, 2);
+    } catch {
+      return <span className="text-red-600">{jsonText}</span>;
+    }
+
+    const jsonTokenRegex =
+      /(\"(?:\\.|[^\"])*\"(?=\s*:))|(\"(?:\\.|[^\"])*\")|\b(true|false|null)\b|\b-?\d+(?:\.\d+)?\b|([{}\[\],:])/g;
+    const segments: ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let index = 0;
+
+    while ((match = jsonTokenRegex.exec(pretty)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(<span key={`t-${index++}`}>{pretty.slice(lastIndex, match.index)}</span>);
+      }
+
+      const token = match[0];
+      let cls = 'text-slate-700';
+      if (match[1]) cls = 'text-blue-700 font-semibold';
+      else if (match[2]) cls = 'text-emerald-700';
+      else if (match[3]) cls = 'text-violet-700 font-semibold';
+      else if (/^-?\d/.test(token)) cls = 'text-amber-700 font-semibold';
+      else if (match[4]) cls = 'text-slate-500';
+
+      segments.push(
+        <span key={`m-${index++}`} className={cls}>
+          {token}
+        </span>,
+      );
+      lastIndex = jsonTokenRegex.lastIndex;
+    }
+
+    if (lastIndex < pretty.length) {
+      segments.push(<span key={`t-${index++}`}>{pretty.slice(lastIndex)}</span>);
+    }
+
+    return (
+      <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-100 px-2 py-1 text-[10px] leading-4 text-slate-700">
+        {segments}
+      </pre>
+    );
+  }, []);
+
+  const renderHighlightedLogLine = useCallback(
+    (line: string) => {
+      const jsonStart = line.indexOf('{');
+      const jsonEnd = line.lastIndexOf('}');
+
+      if (jsonStart === -1 || jsonEnd <= jsonStart) {
+        return renderTokenizedText(line);
+      }
+
+      const prefix = line.slice(0, jsonStart);
+      const jsonText = line.slice(jsonStart, jsonEnd + 1);
+      const suffix = line.slice(jsonEnd + 1);
+
+      return (
+        <>
+          <span>{renderTokenizedText(prefix)}</span>
+          {renderJsonSegment(jsonText)}
+          {suffix ? <span>{renderTokenizedText(suffix)}</span> : null}
+        </>
+      );
+    },
+    [renderJsonSegment, renderTokenizedText],
+  );
 
   // Compute active steps based on session state
   const activeSteps = getActiveSteps(session);
@@ -142,6 +300,8 @@ function GenerationPreviewContent() {
 
     setError(null);
     setCurrentStepIndex(0);
+    setGenerationLogs([]);
+    pushGenerationLog('Generation Preview', 'Generation started');
 
     try {
       // Compute active steps for this session (recomputed after session mutations)
@@ -149,6 +309,10 @@ function GenerationPreviewContent() {
 
       // Determine if we need the PDF analysis step
       const hasPdfToAnalyze = !!currentSession.pdfStorageKey && !currentSession.pdfText;
+      pushGenerationLog(
+        'PDF Parse API',
+        hasPdfToAnalyze ? 'Parsing PDF started' : 'Parsing PDF skipped (already parsed)',
+      );
       // If no PDF to analyze, skip to the next available step
       if (!hasPdfToAnalyze) {
         const firstNonPdfIdx = activeSteps.findIndex((s) => s.id !== 'pdf-analysis');
@@ -190,14 +354,26 @@ function GenerationPreviewContent() {
           parseFormData.append('baseUrl', currentSession.pdfProviderConfig.baseUrl);
         }
 
+        const parseStart = performance.now();
         const parseResponse = await fetch('/api/parse-pdf', {
           method: 'POST',
           body: parseFormData,
           signal,
         });
+        pushNextApiLine(
+          'POST',
+          '/api/parse-pdf',
+          parseResponse.status,
+          performance.now() - parseStart,
+        );
 
         if (!parseResponse.ok) {
-          const errorData = await parseResponse.json();
+          const errorData = await parseResponse.json().catch(() => ({ error: 'Parse PDF failed' }));
+          pushGenerationLog(
+            'PDF Parse API',
+            `PDF parse error payload: ${stringifyErrorPayload(errorData)}`,
+            'ERROR',
+          );
           throw new Error(errorData.error || t('generation.pdfParseFailed'));
         }
 
@@ -205,6 +381,8 @@ function GenerationPreviewContent() {
         if (!parseResult.success || !parseResult.data) {
           throw new Error(t('generation.pdfParseFailed'));
         }
+
+        pushGenerationLog('PDF Parse API', 'PDF parsed successfully');
 
         let pdfText = parseResult.data.text as string;
 
@@ -287,6 +465,11 @@ function GenerationPreviewContent() {
         }
         if (warnings.length > 0) {
           setTruncationWarnings(warnings);
+          pushGenerationLog(
+            'Generation Preview',
+            `Truncation warnings: ${warnings.length}`,
+            'WARN',
+          );
         }
 
         // Reassign local reference for subsequent steps
@@ -297,12 +480,14 @@ function GenerationPreviewContent() {
       // Step: Web Search (if enabled)
       const webSearchStepIdx = activeSteps.findIndex((s) => s.id === 'web-search');
       if (currentSession.requirements.webSearch && webSearchStepIdx >= 0) {
+        pushGenerationLog('Web Search API', 'Web search started');
         setCurrentStepIndex(webSearchStepIdx);
         setWebSearchSources([]);
 
         const wsSettings = useSettingsStore.getState();
         const wsApiKey =
           wsSettings.webSearchProvidersConfig?.[wsSettings.webSearchProviderId]?.apiKey;
+        const webSearchStart = performance.now();
         const res = await fetch('/api/web-search', {
           method: 'POST',
           headers: getApiHeaders(),
@@ -313,9 +498,15 @@ function GenerationPreviewContent() {
           }),
           signal,
         });
+        pushNextApiLine('POST', '/api/web-search', res.status, performance.now() - webSearchStart);
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({ error: 'Web search failed' }));
+          pushGenerationLog(
+            'Web Search API',
+            `Web search error payload: ${stringifyErrorPayload(data)}`,
+            'ERROR',
+          );
           throw new Error(data.error || t('generation.webSearchFailed'));
         }
 
@@ -325,6 +516,7 @@ function GenerationPreviewContent() {
           url: s.url,
         }));
         setWebSearchSources(sources);
+        pushGenerationLog('Web Search API', `Web search completed, sources=${sources.length}`);
 
         const updatedSessionWithSearch = {
           ...currentSession,
@@ -342,12 +534,20 @@ function GenerationPreviewContent() {
       if (currentSession.imageStorageIds && currentSession.imageStorageIds.length > 0) {
         log.debug('Loading images from IndexedDB');
         imageMapping = await loadImageMapping(currentSession.imageStorageIds);
+        pushGenerationLog(
+          'Generation Preview',
+          `Image mapping loaded from IndexedDB (${Object.keys(imageMapping).length})`,
+        );
       } else if (
         currentSession.imageMapping &&
         Object.keys(currentSession.imageMapping).length > 0
       ) {
         log.debug('Using imageMapping from session (old format)');
         imageMapping = currentSession.imageMapping;
+        pushGenerationLog(
+          'Generation Preview',
+          `Image mapping loaded from session (${Object.keys(imageMapping).length})`,
+        );
       }
 
       // ── Agent generation (before outlines so persona can influence structure) ──
@@ -372,6 +572,10 @@ function GenerationPreviewContent() {
       };
 
       if (settings.agentMode === 'auto') {
+        pushGenerationLog(
+          'Agent Profiles API',
+          `Generating agent profiles for "${extractTopicFromRequirement(currentSession.requirements.requirement)}" [model=${getCurrentModelConfig().modelString}]`,
+        );
         const agentStepIdx = activeSteps.findIndex((s) => s.id === 'agent-generation');
         if (agentStepIdx >= 0) setCurrentStepIndex(agentStepIdx);
 
@@ -439,6 +643,7 @@ function GenerationPreviewContent() {
           };
 
           // No outlines yet — agent generation uses only stage name + description
+          const agentProfilesStart = performance.now();
           const agentResp = await fetch('/api/generate/agent-profiles', {
             method: 'POST',
             headers: getApiHeaders(),
@@ -451,8 +656,24 @@ function GenerationPreviewContent() {
             }),
             signal,
           });
+          pushNextApiLine(
+            'POST',
+            '/api/generate/agent-profiles',
+            agentResp.status,
+            performance.now() - agentProfilesStart,
+          );
 
-          if (!agentResp.ok) throw new Error('Agent generation failed');
+          if (!agentResp.ok) {
+            const errData = await agentResp
+              .json()
+              .catch(() => ({ error: `Agent generation failed: HTTP ${agentResp.status}` }));
+            pushGenerationLog(
+              'Agent Profiles API',
+              `Agent profiles generation error: ${stringifyErrorPayload(errData)}`,
+              'ERROR',
+            );
+            throw new Error(errData.error || 'Agent generation failed');
+          }
           const agentData = await agentResp.json();
           if (!agentData.success) throw new Error(agentData.error || 'Agent generation failed');
 
@@ -478,8 +699,17 @@ function GenerationPreviewContent() {
               role: a!.role,
               persona: a!.persona,
             }));
+          pushGenerationLog(
+            'Agent Profiles API',
+            `Successfully generated ${agents.length} agent profiles for "${extractTopicFromRequirement(currentSession.requirements.requirement)}"`,
+          );
         } catch (err: unknown) {
           log.warn('[Generation] Agent generation failed, falling back to presets:', err);
+          pushGenerationLog(
+            'Agent Profiles API',
+            `Auto-generation failed, fallback to presets: ${err instanceof Error ? err.message : String(err)}`,
+            'WARN',
+          );
           const registry = useAgentRegistry.getState();
           const fallbackIds = settings.selectedAgentIds.filter((id) => {
             const a = registry.getAgent(id);
@@ -502,8 +732,14 @@ function GenerationPreviewContent() {
               persona: a!.persona,
             }));
           stage.agentIds = safeFallbackIds;
+          pushGenerationLog(
+            'Generation Preview',
+            `Using preset fallback agents (${agents.length})`,
+            'WARN',
+          );
         }
       } else {
+        pushGenerationLog('Generation Preview', 'Using preset agents');
         // Preset mode — use selected agents (include persona)
         // Filter out stale generated agent IDs that may linger in settings
         const registry = useAgentRegistry.getState();
@@ -528,6 +764,7 @@ function GenerationPreviewContent() {
             persona: a!.persona,
           }));
         stage.agentIds = safePresetAgentIds;
+        pushGenerationLog('Generation Preview', `Preset agents loaded (${agents.length})`);
       }
 
       // ── Generate outlines (with agent personas for teacher context) ──
@@ -536,12 +773,17 @@ function GenerationPreviewContent() {
       const outlineStepIdx = activeSteps.findIndex((s) => s.id === 'outline');
       setCurrentStepIndex(outlineStepIdx >= 0 ? outlineStepIdx : 0);
       if (!outlines || outlines.length === 0) {
+        pushGenerationLog(
+          'Outlines Stream',
+          `Generating outlines: "${extractTopicFromRequirement(currentSession.requirements.requirement)}" [model=${getCurrentModelConfig().modelString}]`,
+        );
         log.debug('=== Generating outlines (SSE) ===');
         setStreamingOutlines([]);
 
         outlines = await new Promise<SceneOutline[]>((resolve, reject) => {
           const collected: SceneOutline[] = [];
 
+          const outlinesStart = performance.now();
           fetch('/api/generate/scene-outlines-stream', {
             method: 'POST',
             headers: getApiHeaders(),
@@ -556,8 +798,19 @@ function GenerationPreviewContent() {
             signal,
           })
             .then((res) => {
+              pushNextApiLine(
+                'POST',
+                '/api/generate/scene-outlines-stream',
+                res.status,
+                performance.now() - outlinesStart,
+              );
               if (!res.ok) {
                 return res.json().then((d) => {
+                  pushGenerationLog(
+                    'Outlines Stream',
+                    `Outlines stream error payload: ${stringifyErrorPayload(d)}`,
+                    'ERROR',
+                  );
                   reject(new Error(d.error || t('generation.outlineGenerateFailed')));
                 });
               }
@@ -586,6 +839,13 @@ function GenerationPreviewContent() {
                           collected.push(evt.data);
                           setStreamingOutlines([...collected]);
                         } else if (evt.type === 'retry') {
+                          const attempt = evt.attempt ?? evt.retryCount ?? '?';
+                          const maxAttempts = evt.maxAttempts ?? evt.totalAttempts ?? '?';
+                          pushGenerationLog(
+                            'Outlines Stream',
+                            `Empty outlines (attempt ${attempt}/${maxAttempts}), retrying...`,
+                            'WARN',
+                          );
                           collected.length = 0;
                           setStreamingOutlines([]);
                           setStatusMessage(t('generation.outlineRetrying'));
@@ -593,6 +853,11 @@ function GenerationPreviewContent() {
                           resolve(evt.outlines || collected);
                           return;
                         } else if (evt.type === 'error') {
+                          pushGenerationLog(
+                            'Outlines Stream',
+                            `Outline generation failed event: ${stringifyErrorPayload(evt)}`,
+                            'ERROR',
+                          );
                           reject(new Error(evt.error));
                           return;
                         }
@@ -620,6 +885,7 @@ function GenerationPreviewContent() {
         const updatedSession = { ...currentSession, sceneOutlines: outlines };
         setSession(updatedSession);
         sessionStorage.setItem('generationSession', JSON.stringify(updatedSession));
+        pushGenerationLog('Outlines Stream', `Generated ${outlines.length} outlines`);
 
         // Outline generation succeeded — clear homepage draft cache
         try {
@@ -643,9 +909,17 @@ function GenerationPreviewContent() {
       store.setStage(stage);
       store.setOutlines(outlines);
 
+      // Generate ONLY the first scene
+      store.setGeneratingOutlines(outlines);
+      const firstOutline = outlines[0];
+
       // Advance to slide-content step
       const contentStepIdx = activeSteps.findIndex((s) => s.id === 'slide-content');
       if (contentStepIdx >= 0) setCurrentStepIndex(contentStepIdx);
+      pushGenerationLog(
+        'Scene Content API',
+        `Generating content: "${firstOutline.title}" (${firstOutline.type}) [model=${getCurrentModelConfig().modelString}]`,
+      );
 
       // Build stageInfo and userProfile for API call
       const stageInfo = {
@@ -660,12 +934,8 @@ function GenerationPreviewContent() {
           ? `Student: ${currentSession.requirements.userNickname || 'Unknown'}${currentSession.requirements.userBio ? ` — ${currentSession.requirements.userBio}` : ''}`
           : undefined;
 
-      // Generate ONLY the first scene
-      store.setGeneratingOutlines(outlines);
-
-      const firstOutline = outlines[0];
-
       // Step 2: Generate content (currentStepIndex is already 2)
+      const sceneContentStart = performance.now();
       const contentResp = await fetch('/api/generate/scene-content', {
         method: 'POST',
         headers: getApiHeaders(),
@@ -680,9 +950,20 @@ function GenerationPreviewContent() {
         }),
         signal,
       });
+      pushNextApiLine(
+        'POST',
+        '/api/generate/scene-content',
+        contentResp.status,
+        performance.now() - sceneContentStart,
+      );
 
       if (!contentResp.ok) {
         const errorData = await contentResp.json().catch(() => ({ error: 'Request failed' }));
+        pushGenerationLog(
+          'Scene Content API',
+          `Scene content error payload: ${stringifyErrorPayload(errorData)}`,
+          'ERROR',
+        );
         throw new Error(errorData.error || t('generation.sceneGenerateFailed'));
       }
 
@@ -690,11 +971,20 @@ function GenerationPreviewContent() {
       if (!contentData.success || !contentData.content) {
         throw new Error(contentData.error || t('generation.sceneGenerateFailed'));
       }
+      pushGenerationLog(
+        'Scene Content API',
+        `Content generated successfully: "${contentData.effectiveOutline?.title || firstOutline.title}"`,
+      );
 
       // Generate actions (activate actions step indicator)
       const actionsStepIdx = activeSteps.findIndex((s) => s.id === 'actions');
       setCurrentStepIndex(actionsStepIdx >= 0 ? actionsStepIdx : currentStepIndex + 1);
+      pushGenerationLog(
+        'Scene Actions API',
+        `Generating actions: "${contentData.effectiveOutline?.title || firstOutline.title}" (${(contentData.effectiveOutline?.type || firstOutline.type) as string}) [model=${getCurrentModelConfig().modelString}]`,
+      );
 
+      const sceneActionsStart = performance.now();
       const actionsResp = await fetch('/api/generate/scene-actions', {
         method: 'POST',
         headers: getApiHeaders(),
@@ -709,9 +999,20 @@ function GenerationPreviewContent() {
         }),
         signal,
       });
+      pushNextApiLine(
+        'POST',
+        '/api/generate/scene-actions',
+        actionsResp.status,
+        performance.now() - sceneActionsStart,
+      );
 
       if (!actionsResp.ok) {
         const errorData = await actionsResp.json().catch(() => ({ error: 'Request failed' }));
+        pushGenerationLog(
+          'Scene Actions API',
+          `Scene actions error payload: ${stringifyErrorPayload(errorData)}`,
+          'ERROR',
+        );
         throw new Error(errorData.error || t('generation.sceneGenerateFailed'));
       }
 
@@ -719,6 +1020,17 @@ function GenerationPreviewContent() {
       if (!data.success || !data.scene) {
         throw new Error(data.error || t('generation.sceneGenerateFailed'));
       }
+      const actionsCount = data.scene.actions?.length || 0;
+      const sceneTitle =
+        data.scene.title || contentData.effectiveOutline?.title || firstOutline.title;
+      pushGenerationLog(
+        'Scene Actions API',
+        `Generated ${actionsCount} actions for: "${sceneTitle}"`,
+      );
+      pushGenerationLog(
+        'Scene Actions API',
+        `Scene assembled successfully: "${sceneTitle}" — ${actionsCount} actions`,
+      );
 
       // Generate TTS for first scene (part of actions step — blocking)
       if (settings.ttsEnabled && settings.ttsProviderId !== 'browser-native-tts') {
@@ -726,12 +1038,19 @@ function GenerationPreviewContent() {
         const speechActions = (data.scene.actions || []).filter(
           (a: { type: string; text?: string }) => a.type === 'speech' && a.text,
         );
+        pushGenerationLog('TTS API', `Generating TTS for ${speechActions.length} speech actions`);
 
         let ttsFailCount = 0;
         for (const action of speechActions) {
           const audioId = `tts_${action.id}`;
           action.audioId = audioId;
           try {
+            pushGenerationLog(
+              'TTS API',
+              `Generating TTS: provider=${settings.ttsProviderId}, model=${settings.ttsModelId || 'default'}, voice=${settings.ttsVoice}, audioId=${audioId}, textLen=${action.text?.length || 0}`,
+            );
+
+            const ttsStart = performance.now();
             const resp = await fetch('/api/generate/tts', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -747,7 +1066,16 @@ function GenerationPreviewContent() {
               }),
               signal,
             });
+            pushNextApiLine('POST', '/api/generate/tts', resp.status, performance.now() - ttsStart);
             if (!resp.ok) {
+              const ttsErrData = await resp
+                .json()
+                .catch(() => ({ error: `TTS failed: HTTP ${resp.status}` }));
+              pushGenerationLog(
+                'TTS API',
+                `TTS error payload: ${stringifyErrorPayload(ttsErrData)}`,
+                'ERROR',
+              );
               ttsFailCount++;
               continue;
             }
@@ -768,6 +1096,11 @@ function GenerationPreviewContent() {
             });
           } catch (err) {
             log.warn(`[TTS] Failed for ${audioId}:`, err);
+            pushGenerationLog(
+              'TTS API',
+              `TTS failed: audioId=${audioId}, reason=${err instanceof Error ? err.message : String(err)}`,
+              'ERROR',
+            );
             ttsFailCount++;
           }
         }
@@ -775,6 +1108,7 @@ function GenerationPreviewContent() {
         if (ttsFailCount > 0 && speechActions.length > 0) {
           throw new Error(t('generation.speechFailed'));
         }
+        pushGenerationLog('TTS API', 'TTS generation completed');
       }
 
       // Add scene to store and navigate
@@ -797,14 +1131,24 @@ function GenerationPreviewContent() {
 
       sessionStorage.removeItem('generationSession');
       await store.saveToStorage();
+      pushGenerationLog('Generation Preview', 'Generation completed, redirecting to classroom');
       router.push(`/classroom/${stage.id}`);
     } catch (err) {
       // AbortError is expected when navigating away — don't show as error
       if (err instanceof DOMException && err.name === 'AbortError') {
         log.info('[GenerationPreview] Generation aborted');
+        pushGenerationLog('Generation Preview', 'Generation aborted', 'WARN');
         return;
       }
       sessionStorage.removeItem('generationSession');
+      pushGenerationLog(
+        'Generation Preview',
+        `Generation failed: ${err instanceof Error ? err.message : String(err)}`,
+        'ERROR',
+      );
+      if (err instanceof Error && err.stack) {
+        pushGenerationLog('Generation Preview', err.stack, 'ERROR');
+      }
       setError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -1035,6 +1379,41 @@ function GenerationPreviewContent() {
             </div>
           </Card>
         </motion.div>
+
+        <div className="w-full max-w-lg">
+          <div className="rounded-2xl border-2 border-slate-900/75 bg-white/85 p-3 text-left shadow-[0_2px_0_rgba(15,23,42,0.16)] backdrop-blur-sm">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-xs font-black uppercase tracking-wide text-slate-700">
+                生成日志 / Generation Logs
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyLogs}
+                disabled={generationLogs.length === 0}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold transition-colors',
+                  generationLogs.length === 0
+                    ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                    : copiedLogs
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                )}
+              >
+                {copiedLogs ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                {copiedLogs ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-slate-600">
+              {generationLogs.length > 0 ? (
+                generationLogs.map((line, idx) => (
+                  <div key={`${idx}-${line}`}>{renderHighlightedLogLine(line)}</div>
+                ))
+              ) : (
+                <div className="text-slate-400">Waiting for generation to start...</div>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Footer Action */}
         <div className="h-16 flex items-center justify-center w-full">

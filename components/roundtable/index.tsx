@@ -115,35 +115,41 @@ export function Roundtable({
     _initialParticipants?.find((participant) => participant.role === 'user')?.avatar ||
     '/avatars/user.png';
 
-  const { isRecording, isProcessing, recordingTime, startRecording, stopRecording, cancelRecording } =
-    useAudioRecorder({
-      onTranscription: (text) => {
-        if (!text.trim()) {
-          toast.info(t('roundtable.noSpeechDetected'));
-          setIsVoiceOpen(false);
-          setActivePanel(null);
-          return;
-        }
-        if (isSendCooldownRef.current) {
-          setIsVoiceOpen(false);
-          setActivePanel(null);
-          return;
-        }
-        onInputActivate?.();
-        onMessageSend?.(text);
-        setIsSendCooldown(true);
-        isSendCooldownRef.current = true;
+  const {
+    isRecording,
+    isProcessing,
+    recordingTime,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+  } = useAudioRecorder({
+    onTranscription: (text) => {
+      if (!text.trim()) {
+        toast.info(t('roundtable.noSpeechDetected'));
         setIsVoiceOpen(false);
         setActivePanel(null);
-        setTimeout(() => {
-          setIsSendCooldown(false);
-          isSendCooldownRef.current = false;
-        }, 1200);
-      },
-      onError: (error) => {
-        toast.error(error);
-      },
-    });
+        return;
+      }
+      if (isSendCooldownRef.current) {
+        setIsVoiceOpen(false);
+        setActivePanel(null);
+        return;
+      }
+      onInputActivate?.();
+      onMessageSend?.(text);
+      setIsSendCooldown(true);
+      isSendCooldownRef.current = true;
+      setIsVoiceOpen(false);
+      setActivePanel(null);
+      setTimeout(() => {
+        setIsSendCooldown(false);
+        isSendCooldownRef.current = false;
+      }, 1200);
+    },
+    onError: (error) => {
+      toast.error(error);
+    },
+  });
 
   const handleSendMessage = () => {
     if (!inputValue.trim() || isSendCooldown) return;
@@ -259,7 +265,7 @@ export function Roundtable({
       <div className="absolute right-3 bottom-3 flex justify-end px-1">
         <div
           className={cn(
-            'pointer-events-auto flex items-center gap-2 rounded-full border-[4px] border-slate-900/85 bg-[#fff8db] px-3 py-2 shadow-[0_4px_0_rgba(15,23,42,0.18)] transition-all',
+            'pointer-events-auto flex items-center gap-1.5 rounded-full border-[3px] border-slate-900/85 bg-[#fff8db] px-2.5 py-1.5 shadow-[0_4px_0_rgba(15,23,42,0.18)] transition-all sm:gap-2 sm:border-[4px] sm:px-3 sm:py-2',
             activePanel ? 'w-[min(520px,calc(100vw-1.5rem))] justify-between' : 'w-auto',
             isCueUser && 'bg-emerald-100',
           )}
@@ -271,31 +277,35 @@ export function Roundtable({
                 onClick={handleToggleVoice}
                 disabled={!asrEnabled || isSendCooldown}
                 className={cn(
-                  'relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-all',
+                  'relative inline-flex h-8 w-8 items-center justify-center rounded-full transition-all sm:h-10 sm:w-10',
                   !asrEnabled || isSendCooldown
                     ? 'text-slate-300 cursor-not-allowed'
                     : 'text-slate-700 hover:bg-orange-100 hover:text-orange-600 active:scale-95',
                 )}
               >
-                {asrEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                {asrEnabled ? (
+                  <Mic className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                ) : (
+                  <MicOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                )}
               </button>
 
-              <div className="h-6 w-px bg-slate-900/15" />
+              <div className="h-5 w-px bg-slate-900/15 sm:h-6" />
 
               <button
                 type="button"
                 onClick={openTextPanel}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition-all hover:bg-sky-100 hover:text-sky-700 active:scale-95"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-700 transition-all hover:bg-sky-100 hover:text-sky-700 active:scale-95 sm:h-10 sm:w-10"
               >
-                <MessageSquare className="w-4 h-4" />
+                <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </button>
 
               <button
                 type="button"
                 onClick={openTextPanel}
-                className="ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full border-[3px] border-slate-900/85 bg-white shadow-[0_2px_0_rgba(15,23,42,0.12)] transition-transform hover:scale-[1.03]"
+                className="ml-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full border-[2px] border-slate-900/85 bg-white shadow-[0_2px_0_rgba(15,23,42,0.12)] transition-transform hover:scale-[1.03] sm:ml-1 sm:h-11 sm:w-11 sm:border-[3px]"
               >
-                <span className="h-8 w-8 overflow-hidden rounded-full border-2 border-sky-300/80 bg-white">
+                <span className="h-6.5 w-6.5 overflow-hidden rounded-full border border-sky-300/80 bg-white sm:h-8 sm:w-8 sm:border-2">
                   <AvatarDisplay src={userAvatar} alt={t('roundtable.you')} />
                 </span>
               </button>
