@@ -206,7 +206,14 @@ export default function ClassroomDetailPage() {
       if (!useStageStore.getState().stage) {
         log.info('No IndexedDB data, trying server-side storage for:', classroomId);
         try {
+          const classroomApiStart = performance.now();
           const res = await fetch(`/api/classroom?id=${encodeURIComponent(classroomId)}`);
+          pushNextApiLine(
+            'GET',
+            '/api/classroom',
+            res.status,
+            performance.now() - classroomApiStart,
+          );
           if (res.ok) {
             const json = await res.json();
             if (json.success && json.classroom) {
@@ -232,6 +239,15 @@ export default function ClassroomDetailPage() {
                 );
               }
             }
+          } else {
+            const data = await res
+              .json()
+              .catch(() => ({ error: `Failed to fetch classroom: HTTP ${res.status}` }));
+            pushClassroomLog(
+              'Classroom API',
+              `Classroom API error payload: ${JSON.stringify(data)}`,
+              'ERROR',
+            );
           }
         } catch (fetchErr) {
           log.warn('Server-side storage fetch failed:', fetchErr);
@@ -285,7 +301,7 @@ export default function ClassroomDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [classroomId, loadFromStorage, pushClassroomLog]);
+  }, [classroomId, loadFromStorage, pushClassroomLog, pushNextApiLine]);
 
   useEffect(() => {
     // Reset loading state on course switch to unmount Stage during transition,

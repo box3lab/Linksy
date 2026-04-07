@@ -93,7 +93,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderConfig> = {
     ],
     supportedAspectRatios: ['16:9', '4:3', '1:1', '9:16'],
     supportedDurations: [6, 10],
-    supportedResolutions: ['720p', '1080p'],
+    supportedResolutions: ['768p', '1080p'],
     maxDuration: 10,
   },
   'grok-video': {

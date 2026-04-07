@@ -152,56 +152,95 @@ export async function generateAndStoreTTS(
   audioId: string,
   text: string,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<{
+  success: boolean;
+  statusCode: number | 'ERR';
+  error?: string;
+  errorPayload?: unknown;
+}> {
   const settings = useSettingsStore.getState();
-  if (settings.ttsProviderId === 'browser-native-tts') return;
+  if (settings.ttsProviderId === 'browser-native-tts') {
+    return { success: true, statusCode: 200 };
+  }
 
   const ttsProviderConfig = settings.ttsProvidersConfig?.[settings.ttsProviderId];
-  const response = await fetch('/api/generate/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text,
-      audioId,
-      ttsProviderId: settings.ttsProviderId,
-      ttsModelId: settings.ttsModelId,
-      ttsVoice: settings.ttsVoice,
-      ttsSpeed: settings.ttsSpeed,
-      ttsApiKey: ttsProviderConfig?.apiKey || undefined,
-      ttsBaseUrl: ttsProviderConfig?.baseUrl || undefined,
-    }),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch('/api/generate/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        audioId,
+        ttsProviderId: settings.ttsProviderId,
+        ttsModelId: settings.ttsModelId,
+        ttsVoice: settings.ttsVoice,
+        ttsSpeed: settings.ttsSpeed,
+        ttsApiKey: ttsProviderConfig?.apiKey || undefined,
+        ttsBaseUrl: ttsProviderConfig?.baseUrl || undefined,
+      }),
+      signal,
+    });
+  } catch (error) {
+    return {
+      success: false,
+      statusCode: 'ERR',
+      error: error instanceof Error ? error.message : 'TTS request failed',
+    };
+  }
 
   const data = await response
     .json()
     .catch(() => ({ success: false, error: response.statusText || 'Invalid TTS response' }));
   if (!response.ok || !data.success || !data.base64 || !data.format) {
-    const err = new Error(
-      data.details || data.error || `TTS request failed: HTTP ${response.status}`,
-    );
-    log.warn('TTS failed for', audioId, ':', err);
-    throw err;
+    const errorMessage =
+      data.details || data.error || `TTS request failed: HTTP ${response.status}`;
+    log.warn('TTS failed for', audioId, ':', errorMessage);
+    return {
+      success: false,
+      statusCode: response.status,
+      error: errorMessage,
+      errorPayload: data,
+    };
   }
 
-  const binary = atob(data.base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  try {
+    const binary = atob(data.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: `audio/${data.format}` });
+    await db.audioFiles.put({
+      id: audioId,
+      blob,
+      format: data.format,
+      createdAt: Date.now(),
+    });
+  } catch (error) {
+    return {
+      success: false,
+      statusCode: response.status,
+      error: error instanceof Error ? error.message : 'Failed to store generated TTS audio',
+    };
   }
-  const blob = new Blob([bytes], { type: `audio/${data.format}` });
-  await db.audioFiles.put({
-    id: audioId,
-    blob,
-    format: data.format,
-    createdAt: Date.now(),
-  });
+
+  return { success: true, statusCode: response.status };
 }
 
 /** Generate TTS for all speech actions in a scene. Returns result. */
 async function generateTTSForScene(
   scene: Scene,
   signal?: AbortSignal,
+  callbacks?: {
+    onLog?: (scope: string, message: string, level?: LogLevel) => void;
+    onApiTiming?: (
+      method: 'GET' | 'POST',
+      path: string,
+      status: number | 'ERR',
+      durationMs: number,
+    ) => void;
+  },
 ): Promise<{ success: boolean; failedCount: number; error?: string }> {
   const providerId = useSettingsStore.getState().ttsProviderId;
   scene.actions = splitLongSpeechActions(scene.actions || [], providerId);
@@ -216,17 +255,36 @@ async function generateTTSForScene(
   for (const action of speechActions) {
     const audioId = `tts_${action.id}`;
     action.audioId = audioId;
-    try {
-      await generateAndStoreTTS(audioId, action.text, signal);
-    } catch (error) {
+    const ttsStart = performance.now();
+    const ttsResult = await generateAndStoreTTS(audioId, action.text, signal);
+    callbacks?.onApiTiming?.(
+      'POST',
+      '/api/generate/tts',
+      ttsResult.statusCode,
+      performance.now() - ttsStart,
+    );
+
+    if (!ttsResult.success) {
       failedCount++;
-      lastError = error instanceof Error ? error.message : `TTS failed for action ${action.id}`;
+      lastError = ttsResult.error || `TTS failed for action ${action.id}`;
+      if (ttsResult.errorPayload) {
+        callbacks?.onLog?.(
+          'TTS API',
+          `TTS error payload: ${stringifyErrorPayload(ttsResult.errorPayload)}`,
+          'ERROR',
+        );
+      }
       log.warn('TTS generation failed:', {
         providerId,
         actionId: action.id,
         textLength: action.text.length,
         error: lastError,
       });
+      callbacks?.onLog?.(
+        'TTS API',
+        `TTS generation failed for action=${action.id}: ${lastError}`,
+        'ERROR',
+      );
     }
   }
 
@@ -419,7 +477,10 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
 
             // TTS generation — failure means the whole scene fails
             if (settings.ttsEnabled && settings.ttsProviderId !== 'browser-native-tts') {
-              const ttsResult = await generateTTSForScene(scene, signal);
+              const ttsResult = await generateTTSForScene(scene, signal, {
+                onLog: options.onLog,
+                onApiTiming: options.onApiTiming,
+              });
               if (!ttsResult.success) {
                 options.onLog?.(
                   'TTS API',

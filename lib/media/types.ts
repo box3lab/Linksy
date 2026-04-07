@@ -221,7 +221,7 @@ export interface VideoProviderConfig {
   /** Supported video durations in seconds */
   supportedDurations?: number[];
   /** Supported output resolutions */
-  supportedResolutions?: Array<'480p' | '720p' | '1080p'>;
+  supportedResolutions?: Array<'480p' | '720p' | '768p' | '1080p'>;
   /** Maximum video duration in seconds */
   maxDuration?: number;
 }
@@ -257,7 +257,7 @@ export interface VideoGenerationOptions {
   /** Desired aspect ratio */
   aspectRatio?: '16:9' | '4:3' | '1:1' | '9:16' | '3:4' | '21:9';
   /** Desired output resolution */
-  resolution?: '480p' | '720p' | '1080p';
+  resolution?: '480p' | '720p' | '768p' | '1080p';
 }
 
 /**
