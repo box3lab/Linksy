@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRequestOrigin } from '@/lib/server/request-origin';
 import { getStripeServerClient } from '@/lib/stripe';
 
 function redirectHome(req: NextRequest, params: Record<string, string>) {
-  const url = new URL('/', req.url);
+  const url = new URL('/', getRequestOrigin(req));
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);
   }

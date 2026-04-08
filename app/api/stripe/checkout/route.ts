@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBillingProduct } from '@/lib/billing/catalog';
+import { getRequestOrigin } from '@/lib/server/request-origin';
 import { getStripeServerClient } from '@/lib/stripe';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 
 type CheckoutBody = {
   productId: string;
 };
-
-function getBaseUrl(req: NextRequest) {
-  return new URL(req.url).origin;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = getStripeServerClient();
-    const origin = getBaseUrl(req);
+    const origin = getRequestOrigin(req);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
