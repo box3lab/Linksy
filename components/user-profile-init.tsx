@@ -4,10 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { createLogger } from '@/lib/logger';
 import { getSupabaseClient } from '@/lib/supabase/client';
-import {
-  DEFAULT_USER_AVATAR,
-  useUserProfileStore,
-} from '@/lib/store/user-profile';
+import { DEFAULT_USER_AVATAR, useUserProfileStore } from '@/lib/store/user-profile';
 
 const log = createLogger('UserProfileInit');
 const LEGACY_PROFILE_STORAGE_KEY = 'user-profile-storage';
@@ -21,9 +18,7 @@ type ProfileSnapshot = {
 function normalizeProfile(input?: Partial<ProfileSnapshot> | null): ProfileSnapshot {
   return {
     avatar:
-      typeof input?.avatar === 'string' && input.avatar.trim()
-        ? input.avatar
-        : DEFAULT_USER_AVATAR,
+      typeof input?.avatar === 'string' && input.avatar.trim() ? input.avatar : DEFAULT_USER_AVATAR,
     nickname: typeof input?.nickname === 'string' ? input.nickname : '',
     bio: typeof input?.bio === 'string' ? input.bio : '',
   };
@@ -145,8 +140,25 @@ export function UserProfileInit() {
 
     const {
       data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange((_event, session) => {
-      void applyUser(session?.user ?? null);
+    } = supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        void applyUser(null);
+        return;
+      }
+
+      try {
+        const {
+          data: { user: latestUser },
+          error,
+        } = await supabaseClient.auth.getUser();
+        if (error) {
+          log.error('Failed to refresh user from cloud on auth state change:', error);
+        }
+        void applyUser(latestUser ?? session.user ?? null);
+      } catch (error) {
+        log.error('Failed to refresh user from cloud on auth state change:', error);
+        void applyUser(session.user ?? null);
+      }
     });
 
     return () => {
