@@ -222,6 +222,7 @@ function HomePage() {
     if (!supabaseClient) return;
 
     let active = true;
+
     supabaseClient.auth.getUser().then(({ data }) => {
       if (!active) return;
       setAuthEmail(data.user?.email ?? null);
@@ -232,11 +233,16 @@ function HomePage() {
 
     const {
       data: { subscription },
-    } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+    } = supabaseClient.auth.onAuthStateChange(async () => {
+      const {
+        data: { user: latestUser },
+      } = await supabaseClient.auth.getUser();
+
       if (!active) return;
-      setAuthEmail(session?.user?.email ?? null);
-      setAiLearningScore(Number(session?.user?.user_metadata?.aiLearningScore ?? 0) || 0);
-      setAccountPlan(readAccountPlanFromMetadata(session?.user?.user_metadata));
+
+      setAuthEmail(latestUser?.email ?? null);
+      setAiLearningScore(Number(latestUser?.user_metadata?.aiLearningScore ?? 0) || 0);
+      setAccountPlan(readAccountPlanFromMetadata(latestUser?.user_metadata));
       setAuthLoading(false);
     });
 
@@ -303,16 +309,14 @@ function HomePage() {
         return;
       }
 
-      let statusResult:
-        | {
-            processed: boolean;
-            kind: 'score_pack' | 'pro_pass' | null;
-            scoreDelta: number;
-            billingCycle: BillingCycle | null;
-            currentScore: number;
-            subscriptionExpiresAt: string | null;
-          }
-        | null = null;
+      let statusResult: {
+        processed: boolean;
+        kind: 'score_pack' | 'pro_pass' | null;
+        scoreDelta: number;
+        billingCycle: BillingCycle | null;
+        currentScore: number;
+        subscriptionExpiresAt: string | null;
+      } | null = null;
 
       for (let attempt = 0; attempt < 6; attempt++) {
         const response = await fetch(
@@ -372,6 +376,14 @@ function HomePage() {
         } else {
           toast.success(t('checkout.success'));
         }
+
+        const {
+          data: { user: latestUser },
+        } = await supabaseClient.auth.getUser();
+        if (latestUser) {
+          setAiLearningScore(Number(latestUser.user_metadata?.aiLearningScore ?? 0) || 0);
+          setAccountPlan(readAccountPlanFromMetadata(latestUser.user_metadata));
+        }
       } else {
         toast.message(t('checkout.pendingBenefits'));
       }
@@ -430,11 +442,7 @@ function HomePage() {
       setOrders(Array.isArray(data.orders) ? data.orders : []);
     } catch (error) {
       setOrders([]);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : t('account.loadOrdersFailed'),
-      );
+      toast.error(error instanceof Error ? error.message : t('account.loadOrdersFailed'));
     } finally {
       setOrdersLoading(false);
     }
@@ -488,7 +496,11 @@ function HomePage() {
     try {
       await createCheckoutSession({
         productId:
-          scoreToAdd === 10 ? 'score_pack_10_test' : scoreToAdd === 50 ? 'score_pack_50' : 'score_pack_100',
+          scoreToAdd === 10
+            ? 'score_pack_10_test'
+            : scoreToAdd === 50
+              ? 'score_pack_50'
+              : 'score_pack_100',
       });
     } finally {
       setPurchasingPackScore(null);
@@ -870,9 +882,7 @@ function HomePage() {
 
                   <div className="mt-2 rounded-[14px] border-[3px] border-slate-900/10 bg-[#fff8e6] px-2.5 py-2 text-[11px] text-slate-700 md:mt-3 md:rounded-[18px] md:px-3 md:py-3 md:text-xs">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="font-black text-slate-500">
-                        {t('account.currentPlan')}
-                      </span>
+                      <span className="font-black text-slate-500">{t('account.currentPlan')}</span>
                       <span className="font-black text-slate-900">
                         {accountPlan.plan === 'pro'
                           ? accountPlan.billingCycle === 'yearly'
@@ -882,9 +892,7 @@ function HomePage() {
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
-                      <span className="font-black text-slate-500">
-                        {t('account.expiresOn')}
-                      </span>
+                      <span className="font-black text-slate-500">{t('account.expiresOn')}</span>
                       <span className="font-bold text-slate-700">
                         {accountPlan.plan === 'pro'
                           ? formatDateTime(accountPlan.expiresAt, locale, t('common.na'))
@@ -969,9 +977,7 @@ function HomePage() {
             showCloseButton={false}
             className="w-[min(920px,calc(100vw-20px))] max-w-none rounded-[24px] border-[4px] border-slate-900/80 bg-[#fff8e6] p-0 shadow-[0_10px_0_rgba(15,23,42,0.15)] md:w-[min(920px,calc(100vw-32px))] md:rounded-[32px]"
           >
-            <DialogTitle className="sr-only">
-              {t('billing.dialogTitle')}
-            </DialogTitle>
+            <DialogTitle className="sr-only">{t('billing.dialogTitle')}</DialogTitle>
 
             <div className="relative max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-[18px] p-3 md:max-h-[88vh] md:rounded-[28px] md:p-6">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.2),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.18),transparent_30%)]" />
@@ -1069,20 +1075,12 @@ function HomePage() {
                     )}
                     disabled
                   >
-                    {isCurrentFreePlan
-                      ? t('billing.currentPlan')
-                      : t('billing.basicPlan')}
+                    {isCurrentFreePlan ? t('billing.currentPlan') : t('billing.basicPlan')}
                   </button>
                   <div className="mt-4 space-y-1.5 text-[11px] text-slate-700 md:mt-6 md:space-y-3 md:text-sm">
-                    <div>
-                      {t('billing.freeFeature1')}
-                    </div>
-                    <div>
-                      {t('billing.freeFeature2')}
-                    </div>
-                    <div>
-                      {t('billing.freeFeature3')}
-                    </div>
+                    <div>{t('billing.freeFeature1')}</div>
+                    <div>{t('billing.freeFeature2')}</div>
+                    <div>{t('billing.freeFeature3')}</div>
                   </div>
                 </div>
 
@@ -1124,19 +1122,13 @@ function HomePage() {
                     {isCurrentProPlan
                       ? t('billing.currentPlan')
                       : startingSubscription
-                      ? t('billing.redirecting')
-                      : t('billing.upgradeNow')}
+                        ? t('billing.redirecting')
+                        : t('billing.upgradeNow')}
                   </button>
                   <div className="mt-4 space-y-1.5 text-[11px] text-slate-700 md:mt-6 md:space-y-3 md:text-sm">
-                    <div>
-                      {t('billing.proFeature1')}
-                    </div>
-                    <div>
-                      {t('billing.proFeature2')}
-                    </div>
-                    <div>
-                      {t('billing.proFeature3')}
-                    </div>
+                    <div>{t('billing.proFeature1')}</div>
+                    <div>{t('billing.proFeature2')}</div>
+                    <div>{t('billing.proFeature3')}</div>
                   </div>
                 </div>
               </div>
@@ -1222,9 +1214,7 @@ function HomePage() {
             showCloseButton={false}
             className="w-[min(760px,calc(100vw-20px))] max-w-none rounded-[24px] border-[4px] border-slate-900/80 bg-[#fff8e6] p-0 shadow-[0_10px_0_rgba(15,23,42,0.15)] md:w-[min(760px,calc(100vw-32px))] md:rounded-[32px]"
           >
-            <DialogTitle className="sr-only">
-              {t('account.myOrders')}
-            </DialogTitle>
+            <DialogTitle className="sr-only">{t('account.myOrders')}</DialogTitle>
 
             <div className="relative max-h-[82vh] overflow-y-auto overflow-x-hidden rounded-[18px] p-3 pretty-scrollbar md:max-h-[86vh] md:rounded-[28px] md:p-6">
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.2),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(251,191,36,0.18),transparent_30%)]" />
@@ -1339,7 +1329,9 @@ function HomePage() {
                           </div>
                           <div className="text-right">
                             <div className="text-lg font-black text-slate-900 md:text-2xl">
-                              {(order.amount_paid / 100).toFixed(order.amount_paid % 100 === 0 ? 0 : 2)}
+                              {(order.amount_paid / 100).toFixed(
+                                order.amount_paid % 100 === 0 ? 0 : 2,
+                              )}
                               <span className="ml-1 text-xs font-bold text-slate-500 uppercase md:text-sm">
                                 {order.currency}
                               </span>
@@ -1357,11 +1349,7 @@ function HomePage() {
                         {order.product_kind === 'pro_pass' && order.subscription_expires_at ? (
                           <div className="mt-2 text-[11px] font-bold text-slate-600 md:text-xs">
                             {t('account.accessUntil')}
-                            {formatDateTime(
-                              order.subscription_expires_at,
-                              locale,
-                              t('common.na'),
-                            )}
+                            {formatDateTime(order.subscription_expires_at, locale, t('common.na'))}
                           </div>
                         ) : null}
                       </div>
@@ -1535,11 +1523,7 @@ function HomeSidebar({
     <aside className="fixed left-0 top-0 bottom-0 z-30 w-[180px] sm:w-[200px] lg:w-[272px] rounded-none bg-sky-200/75 border-r-[4px] border-r-slate-900/90 backdrop-blur-sm shadow-[0_2px_0_rgba(15,23,42,0.2)] flex-col overflow-hidden">
       <div className="px-4 pt-4 pb-3 border-b-[3px] border-slate-900/70 bg-sky-100/35">
         <div className="flex items-center gap-2">
-          <img
-            src={getSidebarLogo(locale)}
-            alt="Linksy"
-            className="h-10 sm:h-12 w-auto"
-          />
+          <img src={getSidebarLogo(locale)} alt="Linksy" className="h-10 sm:h-12 w-auto" />
         </div>
         {/* <p className="mt-1 text-[11px] text-slate-700/85">{t('home.slogan')}</p> */}
       </div>
