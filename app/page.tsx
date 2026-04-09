@@ -53,7 +53,7 @@ const LANGUAGE_STORAGE_KEY = 'generationLanguage';
 interface FormState {
   pdfFile: File | null;
   requirement: string;
-  language: 'zh-CN' | 'en-US';
+  language: 'zh-CN' | 'en-US' | 'ja-JP';
   webSearch: boolean;
 }
 
@@ -169,10 +169,15 @@ function HomePage() {
       const savedLanguage = localStorage.getItem(LANGUAGE_STORAGE_KEY);
       const updates: Partial<FormState> = {};
       if (savedWebSearch === 'true') updates.webSearch = true;
-      if (savedLanguage === 'zh-CN' || savedLanguage === 'en-US') {
+      if (savedLanguage === 'zh-CN' || savedLanguage === 'en-US' || savedLanguage === 'ja-JP') {
         updates.language = savedLanguage;
       } else {
-        const detected = navigator.language?.startsWith('zh') ? 'zh-CN' : 'en-US';
+        const navLanguage = navigator.language?.toLowerCase() ?? '';
+        const detected = navLanguage.startsWith('zh')
+          ? 'zh-CN'
+          : navLanguage.startsWith('ja')
+            ? 'ja-JP'
+            : 'en-US';
         updates.language = detected;
       }
       if (Object.keys(updates).length > 0) {
