@@ -517,7 +517,9 @@
       "kimi": "Kimi",
       "minimax": "MiniMax",
       "glm": "GLM",
-      "siliconflow": "SiliconFlow"
+      "siliconflow": "SiliconFlow",
+      "doubao": "豆包",
+      "ollama": "Ollama（ローカルモデル）"
     },
     "providerTypes": {
       "openai": "OpenAIプロトコル",
