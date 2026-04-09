@@ -7,6 +7,7 @@ import {
   Video,
   Volume2,
   Mic,
+  BrainCircuit,
   SlidersHorizontal,
   ChevronRight,
   Play,
@@ -34,8 +35,10 @@ import { IMAGE_PROVIDERS } from '@/lib/media/image-providers';
 import { VIDEO_PROVIDERS } from '@/lib/media/video-providers';
 import { TTS_PROVIDERS, getTTSVoices } from '@/lib/audio/constants';
 import { ASR_PROVIDERS, getASRSupportedLanguages } from '@/lib/audio/constants';
+import { PROVIDERS } from '@/lib/ai/providers';
 import type { ImageProviderId, VideoProviderId } from '@/lib/media/types';
 import type { TTSProviderId, ASRProviderId } from '@/lib/audio/types';
+import type { ProviderId } from '@/lib/ai/providers';
 import type { SettingsSection } from '@/lib/types/settings';
 
 interface MediaPopoverProps {
@@ -57,7 +60,7 @@ const VIDEO_PROVIDER_ICONS: Record<string, string> = {
   'grok-video': '/logos/grok.svg',
 };
 
-type TabId = 'image' | 'video' | 'tts' | 'asr';
+type TabId = 'llm' | 'image' | 'video' | 'tts' | 'asr';
 
 const LANG_LABELS: Record<string, string> = {
   zh: '中文',
@@ -75,6 +78,7 @@ const LANG_LABELS: Record<string, string> = {
 };
 
 const TABS: Array<{ id: TabId; icon: LucideIcon; label: string }> = [
+  { id: 'llm', icon: BrainCircuit, label: 'LLM' },
   { id: 'image', icon: ImageIcon, label: 'Image' },
   { id: 'video', icon: Video, label: 'Video' },
   { id: 'tts', icon: Volume2, label: 'TTS' },
@@ -112,6 +116,11 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
   const { previewing, startPreview, stopPreview } = useTTSPreview();
 
   // ─── Store ───
+  const providerId = useSettingsStore((s) => s.providerId);
+  const modelId = useSettingsStore((s) => s.modelId);
+  const providersConfig = useSettingsStore((s) => s.providersConfig);
+  const setModel = useSettingsStore((s) => s.setModel);
+
   const imageGenerationEnabled = useSettingsStore((s) => s.imageGenerationEnabled);
   const videoGenerationEnabled = useSettingsStore((s) => s.videoGenerationEnabled);
   const ttsEnabled = useSettingsStore((s) => s.ttsEnabled);
@@ -149,6 +158,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
   const setASRLanguage = useSettingsStore((s) => s.setASRLanguage);
 
   const enabledMap: Record<TabId, boolean> = {
+    llm: false,
     image: imageGenerationEnabled,
     video: videoGenerationEnabled,
     tts: ttsEnabled,
@@ -179,6 +189,24 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
     window.speechSynthesis.addEventListener('voiceschanged', load);
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, []);
+
+  // ─── LLM groups ───
+  const llmGroups = useMemo(
+    () =>
+      Object.values(PROVIDERS)
+        .filter((p) => cfgOk(providersConfig, p.id, p.requiresApiKey))
+        .map((p) => ({
+          groupId: p.id,
+          groupName: p.name,
+          groupIcon: p.icon,
+          available: true,
+          items: (providersConfig[p.id]?.models || p.models).map((m) => ({
+            id: m.id,
+            name: m.name,
+          })),
+        })),
+    [providersConfig],
+  );
 
   // ─── Grouped select data (only available providers) ───
   const imageGroups = useMemo(
@@ -322,7 +350,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
     setOpen(isOpen);
     if (isOpen) {
       const first = (['image', 'video', 'tts', 'asr'] as TabId[]).find((id) => enabledMap[id]);
-      setActiveTab(first || 'image');
+      setActiveTab(first || 'llm');
     }
   };
 
@@ -377,6 +405,21 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
 
         {/* ── Tab content ── */}
         <div className="p-3 pt-2.5">
+          {activeTab === 'llm' && (
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2.5">
+                <BrainCircuit className="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
+                <span className="flex-1 text-sm font-medium">{t('media.llmModel')}</span>
+              </div>
+              <GroupedSelect
+                groups={llmGroups}
+                selectedGroupId={providerId}
+                selectedItemId={modelId}
+                onSelect={(gid, iid) => setModel(gid as ProviderId, iid)}
+              />
+            </div>
+          )}
+
           {activeTab === 'image' && (
             <TabPanel
               icon={ImageIcon}
@@ -453,7 +496,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
           <button
             onClick={() => {
               setOpen(false);
-              onSettingsOpen(activeTab);
+              onSettingsOpen(activeTab === 'llm' ? 'providers' : activeTab);
             }}
             className="w-full flex items-center justify-between px-3.5 py-2.5 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
           >

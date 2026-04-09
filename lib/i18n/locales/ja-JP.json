@@ -974,6 +974,7 @@
     "editTooltip": "クリックしてプロフィールを編集"
   },
   "media": {
+    "llmModel": "言語モデル",
     "imageCapability": "画像生成",
     "imageHint": "スライドに画像を生成",
     "videoCapability": "動画生成",

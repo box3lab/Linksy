@@ -974,6 +974,7 @@
     "editTooltip": "Click to edit profile"
   },
   "media": {
+    "llmModel": "Language Model",
     "imageCapability": "Image Generation",
     "imageHint": "Generate images in slides",
     "videoCapability": "Video Generation",
