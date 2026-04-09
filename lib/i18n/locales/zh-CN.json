@@ -974,6 +974,7 @@
     "editTooltip": "点击编辑个人资料"
   },
   "media": {
+    "llmModel": "语言模型",
     "imageCapability": "图像生成",
     "imageHint": "课件中生成配图",
     "videoCapability": "视频生成",
