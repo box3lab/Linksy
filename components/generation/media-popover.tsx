@@ -496,7 +496,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
           <button
             onClick={() => {
               setOpen(false);
-              onSettingsOpen(activeTab);
+              onSettingsOpen(activeTab === 'llm' ? 'providers' : activeTab);
             }}
             className="w-full flex items-center justify-between px-3.5 py-2.5 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
           >
