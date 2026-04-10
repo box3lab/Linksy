@@ -47,6 +47,7 @@ async function ensureDir(dir: string) {
 
 const DOWNLOAD_TIMEOUT_MS = 120_000; // 2 minutes
 const DOWNLOAD_MAX_SIZE = 100 * 1024 * 1024; // 100 MB
+const TTS_CONCURRENCY = 4;
 
 async function downloadToBuffer(url: string): Promise<Buffer> {
   const resp = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
@@ -226,7 +227,10 @@ export async function generateTTSForClassroom(
   }
   const ttsBaseUrl = resolveTTSBaseUrl(providerId) || TTS_PROVIDERS[providerId]?.defaultBaseUrl;
   const voice = DEFAULT_TTS_VOICES[providerId] || 'default';
-  const format = TTS_PROVIDERS[providerId]?.supportedFormats?.[0] || 'mp3';
+  const fallbackFormat = TTS_PROVIDERS[providerId]?.supportedFormats?.[0] || 'mp3';
+
+  type TTSJob = { action: SpeechAction; audioId: string; text: string };
+  const jobs: TTSJob[] = [];
 
   for (const scene of scenes) {
     if (!scene.actions) continue;
@@ -239,22 +243,41 @@ export async function generateTTSForClassroom(
       if (action.type !== 'speech' || !(action as SpeechAction).text) continue;
       const speechAction = action as SpeechAction;
       const audioId = `tts_${action.id}`;
-
-      try {
-        const result = await generateTTS(
-          { providerId, apiKey, baseUrl: ttsBaseUrl, voice, speed: speechAction.speed },
-          speechAction.text,
-        );
-
-        const filename = `${audioId}.${format}`;
-        await fs.writeFile(path.join(audioDir, filename), result.audio);
-
-        speechAction.audioId = audioId;
-        speechAction.audioUrl = mediaServingUrl(baseUrl, classroomId, `audio/${filename}`);
-        log.info(`Generated TTS: ${filename} (${result.audio.length} bytes)`);
-      } catch (err) {
-        log.warn(`TTS generation failed for action ${action.id}:`, err);
-      }
+      jobs.push({ action: speechAction, audioId, text: speechAction.text });
     }
   }
+
+  if (jobs.length === 0) return;
+
+  const workerCount = Math.min(TTS_CONCURRENCY, jobs.length);
+  let nextJobIndex = 0;
+
+  log.info(`Generating TTS for ${jobs.length} speech actions with concurrency=${workerCount}`);
+
+  const runWorker = async () => {
+    while (true) {
+      const index = nextJobIndex++;
+      if (index >= jobs.length) return;
+
+      const job = jobs[index];
+      try {
+        const result = await generateTTS(
+          { providerId, apiKey, baseUrl: ttsBaseUrl, voice, speed: job.action.speed },
+          job.text,
+        );
+
+        const fileFormat = result.format || fallbackFormat;
+        const filename = `${job.audioId}.${fileFormat}`;
+        await fs.writeFile(path.join(audioDir, filename), result.audio);
+
+        job.action.audioId = job.audioId;
+        job.action.audioUrl = mediaServingUrl(baseUrl, classroomId, `audio/${filename}`);
+        log.info(`Generated TTS: ${filename} (${result.audio.length} bytes)`);
+      } catch (err) {
+        log.warn(`TTS generation failed for action ${job.action.id}:`, err);
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 }
