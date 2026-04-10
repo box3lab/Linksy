@@ -1,28 +1,89 @@
-# Repository Guidelines
+# CLAUDE.md
 
-## Project Structure & Module Organization
-This repository is a Next.js 16 app with a pnpm workspace. Main application code lives in `app/` (App Router pages and API routes), `components/` (UI and feature components), and `lib/` (shared orchestration, media, server, storage, and utility code). Static assets are in `public/` and `assets/`. Automated tests are split between `tests/` for Vitest unit coverage and `e2e/` for Playwright browser flows. Workspace packages under `packages/` contain bundled libraries such as `mathml2omml` and `pptxgenjs`.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build, Test, and Development Commands
-Use Node `>=20.9.0` and `pnpm`.
+## What Is This
 
-- `pnpm install` installs dependencies and builds workspace packages via `postinstall`.
-- `pnpm dev` starts the local app on `http://localhost:3000`.
-- `pnpm build` creates the production build; `pnpm start` serves it.
-- `pnpm lint` runs ESLint with the Next.js + TypeScript config.
-- `pnpm check` verifies Prettier formatting; `pnpm format` rewrites files.
-- `pnpm test` runs unit tests in `tests/**/*.test.ts`.
-- `pnpm test:e2e` runs Playwright flows in `e2e/tests` against port `3002`.
-- `npx tsc --noEmit` is the expected type-check before opening a PR.
+**OpenMAIC** (Open Multi-Agent Interactive Classroom) is an open-source AI platform that turns topics or documents into interactive classroom experiences — AI-generated slides, quizzes, simulations, and multi-agent discussions with TTS/ASR, whiteboard drawing, web search, and export to PPTX or interactive HTML.
 
-## Coding Style & Naming Conventions
-Prettier is authoritative: 2-space indentation, semicolons, single quotes, trailing commas, and `printWidth: 100`. Prefer TypeScript for app code. Use `PascalCase` for React components, `camelCase` for functions/hooks/utilities, and `kebab-case` for route folders and most file names. Keep user-facing strings internationalized; do not hardcode copy in UI changes. ESLint allows intentionally unused variables only when prefixed with `_`.
+## Commands
 
-## Testing Guidelines
-Add or update Vitest coverage for logic in `lib/`, stores, provider config, and similar pure modules. Keep test files named `*.test.ts` under `tests/`. Use Playwright for user flows, page interactions, and regressions that span API + UI. For UI work, run `pnpm test:e2e` or at least the affected spec before review.
+```bash
+pnpm dev            # Start dev server (http://localhost:3000)
+pnpm build          # Production build
+pnpm lint           # ESLint
+pnpm check          # Prettier check
+pnpm format         # Prettier auto-format
+pnpm test           # Vitest unit tests
+pnpm test:e2e       # Playwright E2E tests
+npx tsc --noEmit    # Type-check only
+```
 
-## Commit & Pull Request Guidelines
-Commits follow Conventional Commits, e.g. `feat(media-popover): add LLM tab` or `fix(auth): refresh user data`. Open focused PRs against `main`, link an issue with `Closes #123` or `Fixes #123`, and explain both what changed and why. Include before/after screenshots for UI changes, keep the PR in draft until local verification is done, and ensure formatting, linting, type-checking, and relevant tests pass first.
+Minimum setup: copy `.env.example` → `.env.local` and provide at least one LLM API key. `DEFAULT_MODEL` defaults to `anthropic:claude-3-5-haiku-20241022`.
 
-## Security & Configuration Tips
-Copy `.env.example` to `.env.local` for local setup and never commit secrets. At least one model provider key is required for full functionality. For security-sensitive changes, prefer private reporting via GitHub Security Advisories instead of public issues.
+Docker: `docker compose up --build` (runs on port 3000, mounts `openmaic-data:/app/data`).
+
+## Architecture
+
+### Request & Data Flow
+
+```
+Home page (topic input)
+  → POST /api/generate-classroom         # submits async generation job
+  → GET  /api/generate-classroom/[jobId] # polls for completion
+
+Classroom page (/classroom/[id])
+  → GET /api/classroom/[id]              # loads saved scenes
+  → Playback engine drives state machine (idle → playing → live)
+  → Action executor dispatches 28+ action types to canvas/whiteboard/audio
+
+Multi-agent chat
+  → POST /api/chat (SSE stream)
+  → LangGraph DirectorGraph orchestrates agent turns
+  → Vercel AI SDK streams text deltas + tool calls to client
+```
+
+### Key Directories
+
+| Path | Role |
+|---|---|
+| `app/` | Next.js routes and API handlers |
+| `app/api/` | ~18 API endpoints (generate, chat, export, media, etc.) |
+| `lib/generation/` | Two-stage lesson pipeline: outline → scene content → actions |
+| `lib/orchestration/` | LangGraph director graph for multi-agent chat |
+| `lib/playback/` | Playback state machine (idle/playing/live) |
+| `lib/action/` | Executes AI-generated actions on stage/canvas/whiteboard |
+| `lib/ai/` | Unified LLM abstraction over 10+ providers via Vercel AI SDK |
+| `lib/audio/` | TTS & ASR provider adapters |
+| `lib/media/` | Image & video generation providers |
+| `lib/store/` | 9 Zustand stores (canvas, stage, settings, whiteboard, etc.) |
+| `lib/hooks/` | 55+ custom React hooks |
+| `lib/server/` | Server-only utilities (provider config, model resolution, API responses) |
+| `lib/export/` | PPTX generation and interactive HTML export |
+| `lib/types/` | Centralized TypeScript types |
+| `components/` | React UI components |
+| `packages/` | Workspace packages: `pptxgenjs` (fork) and `mathml2omml` |
+
+### Two-Stage Generation Pipeline
+
+1. **Outline stage** (`lib/generation/outline-generator.ts`): LLM generates scene outlines from topic/materials via streaming JSON
+2. **Content stage** (`lib/generation/scene-generator.ts`): Each outline scene is expanded into fully structured content (slides, quizzes, simulations)
+3. **Action stage** (`lib/generation/action-parser.ts`): Scene content is parsed into discrete actions for playback; malformed JSON is repaired by `lib/generation/json-repair.ts`
+
+### Multi-Agent Orchestration
+
+`lib/orchestration/director-graph.ts` defines a LangGraph `StateGraph`. The director decides agent turn order; each agent uses Vercel AI SDK tool calls to perform web search, whiteboard drawing, TTS, etc. State is client-held — the server is stateless between requests.
+
+### Provider Configuration
+
+LLM, TTS, ASR, image, and video providers are configured via environment variables or `server-providers.yml` (server-side, not committed). Priority: `.env.local` > `server-providers.yml` > env. See `lib/server/provider-config.ts` for merge logic and `lib/ai/providers.ts` for provider registration.
+
+## Code Style
+
+- **Prettier**: 100-char line width, 2-space indent, single quotes, trailing commas — run `pnpm format` before committing
+- **i18n required**: All user-facing strings must use i18next (`lib/i18n/`); current locales are `zh-CN` and `en-US`
+- **No refactor-only PRs** (per CONTRIBUTING.md)
+
+## Branch & PR Conventions
+
+Branch prefixes: `feat/`, `fix/`, `docs/`. Pre-PR checks: `pnpm format && pnpm lint && npx tsc --noEmit && pnpm test`. Link PRs to related issues and include screenshots for UI changes.

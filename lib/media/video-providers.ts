@@ -17,6 +17,10 @@ import {
   testMiniMaxVideoConnectivity,
 } from './adapters/minimax-video-adapter';
 import { generateWithGrokVideo, testGrokVideoConnectivity } from './adapters/grok-video-adapter';
+import {
+  generateWithOpenRouterVideo,
+  testOpenRouterVideoConnectivity,
+} from './adapters/openrouter-video-adapter';
 
 export const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderConfig> = {
   seedance: {
@@ -106,6 +110,20 @@ export const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderConfig> = {
     supportedDurations: [6],
     maxDuration: 6,
   },
+  'openrouter-video': {
+    id: 'openrouter-video',
+    name: 'OpenRouter Video',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+    models: [
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+      { id: 'openai/gpt-4o', name: 'GPT-4o' },
+      { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
+    ],
+    supportedAspectRatios: ['16:9', '4:3', '1:1', '9:16'],
+    supportedDurations: [6, 10],
+    maxDuration: 10,
+  },
 };
 
 export async function testVideoConnectivity(
@@ -118,10 +136,15 @@ export async function testVideoConnectivity(
       return testKlingConnectivity(config);
     case 'veo':
       return testVeoConnectivity(config);
+    case 'sora':
+      // TODO: Implement Sora connectivity test
+      return { success: false, message: 'Sora provider not yet implemented' };
     case 'minimax-video':
       return testMiniMaxVideoConnectivity(config);
     case 'grok-video':
       return testGrokVideoConnectivity(config);
+    case 'openrouter-video':
+      return testOpenRouterVideoConnectivity(config);
     default:
       return {
         success: false,
@@ -187,6 +210,8 @@ export async function generateVideo(
       return generateWithMiniMaxVideo(config, options);
     case 'grok-video':
       return generateWithGrokVideo(config, options);
+    case 'openrouter-video':
+      return generateWithOpenRouterVideo(config, options);
     default:
       throw new Error(`Unsupported video provider: ${config.providerId}`);
   }

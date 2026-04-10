@@ -49,6 +49,7 @@ const LLM_ENV_MAP: Record<string, string> = {
   SILICONFLOW: 'siliconflow',
   DOUBAO: 'doubao',
   GROK: 'grok',
+  OPENROUTER: 'openrouter',
 };
 
 const TTS_ENV_MAP: Record<string, string> = {
@@ -77,6 +78,7 @@ const IMAGE_ENV_MAP: Record<string, string> = {
   IMAGE_NANO_BANANA: 'nano-banana',
   IMAGE_MINIMAX: 'minimax-image',
   IMAGE_GROK: 'grok-image',
+  IMAGE_OPENROUTER: 'openrouter-image',
 };
 
 const VIDEO_ENV_MAP: Record<string, string> = {
@@ -86,6 +88,7 @@ const VIDEO_ENV_MAP: Record<string, string> = {
   VIDEO_SORA: 'sora',
   VIDEO_MINIMAX: 'minimax-video',
   VIDEO_GROK: 'grok-video',
+  VIDEO_OPENROUTER: 'openrouter-video',
 };
 
 const WEB_SEARCH_ENV_MAP: Record<string, string> = {

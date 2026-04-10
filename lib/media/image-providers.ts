@@ -17,6 +17,10 @@ import {
   testMiniMaxImageConnectivity,
 } from './adapters/minimax-image-adapter';
 import { generateWithGrokImage, testGrokImageConnectivity } from './adapters/grok-image-adapter';
+import {
+  generateWithOpenRouterImage,
+  testOpenRouterImageConnectivity,
+} from './adapters/openrouter-image-adapter';
 
 export const IMAGE_PROVIDERS: Record<ImageProviderId, ImageProviderConfig> = {
   seedream: {
@@ -93,6 +97,19 @@ export const IMAGE_PROVIDERS: Record<ImageProviderId, ImageProviderConfig> = {
     ],
     supportedAspectRatios: ['16:9', '4:3', '1:1', '9:16'],
   },
+  'openrouter-image': {
+    id: 'openrouter-image',
+    name: 'OpenRouter Image',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+    models: [
+      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+      { id: 'openai/gpt-4o', name: 'GPT-4o' },
+      { id: 'openai/dall-e-3', name: 'DALL-E 3' },
+      { id: 'stability-ai/stable-diffusion-3', name: 'Stable Diffusion 3' },
+    ],
+    supportedAspectRatios: ['16:9', '4:3', '1:1', '9:16'],
+  },
 };
 
 export async function testImageConnectivity(
@@ -109,6 +126,8 @@ export async function testImageConnectivity(
       return testMiniMaxImageConnectivity(config);
     case 'grok-image':
       return testGrokImageConnectivity(config);
+    case 'openrouter-image':
+      return testOpenRouterImageConnectivity(config);
     default:
       return {
         success: false,
@@ -132,6 +151,8 @@ export async function generateImage(
       return generateWithMiniMaxImage(config, options);
     case 'grok-image':
       return generateWithGrokImage(config, options);
+    case 'openrouter-image':
+      return generateWithOpenRouterImage(config, options);
     default:
       throw new Error(`Unsupported image provider: ${config.providerId}`);
   }

@@ -898,6 +898,7 @@
     "providerNanoBanana": "Nano Banana (Gemini)",
     "providerMiniMaxImage": "MiniMax Image",
     "providerGrokImage": "Grok Image (xAI)",
+    "providerOpenRouterImage": "OpenRouter",
     "testImageGeneration": "Test Image Generation",
     "testImageConnectivity": "Test Connection",
     "imageConnectivitySuccess": "Image service connected successfully",
@@ -920,6 +921,7 @@
     "providerSora": "Sora (OpenAI)",
     "providerMiniMaxVideo": "MiniMax Video",
     "providerGrokVideo": "Grok Video (xAI)",
+    "providerOpenRouterVideo": "OpenRouter",
     "testVideoGeneration": "Test Video Generation",
     "testVideoConnectivity": "Test Connection",
     "videoConnectivitySuccess": "Video service connected successfully",
@@ -961,6 +963,40 @@
     "webSearchBaseUrl": "Base URL",
     "webSearchServerConfigured": "Server-side Tavily API key is configured",
     "optional": "Optional"
+  },
+  "comic": {
+    "title": {
+      "failed": "Comic generation failed",
+      "preparing": "Preparing comic world",
+      "reader": "Comic Reader"
+    },
+    "errors": {
+      "historyGenerating": "This comic history is still generating. Please try again shortly.",
+      "missingSession": "Missing comic generation session",
+      "invalidSession": "Invalid comic generation session"
+    },
+    "status": {
+      "starting": "Starting comic generation...",
+      "planningPage": "Planning page {{page}}...",
+      "renderingPage": "Rendering page {{page}}...",
+      "narratingPage": "Generating narration for page {{page}}...",
+      "stopped": "Generation stopped",
+      "reachedMaxPages": "Reached max pages ({{maxPages}}), generation stopped",
+      "composing": "AI is composing story and visuals...",
+      "waiting": "Waiting",
+      "generatingNextPages": "AI is generating next pages...",
+      "stoppedByAi": "AI generation stopped"
+    },
+    "actions": {
+      "backHome": "Back Home",
+      "replayAudio": "Replay Audio",
+      "prevPage": "Prev",
+      "nextPage": "Next"
+    },
+    "preparingHint": "Preparing... cute animal students are entering",
+    "footer": {
+      "creating": "AI IS CREATING"
+    }
   },
   "profile": {
     "title": "Profile",
