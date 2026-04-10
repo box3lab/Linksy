@@ -145,6 +145,7 @@ const IMAGE_PROVIDER_NAMES: Record<ImageProviderId, string> = {
   'nano-banana': 'providerNanoBanana',
   'minimax-image': 'providerMiniMaxImage',
   'grok-image': 'providerGrokImage',
+  'openrouter-image': 'providerOpenRouterImage',
 };
 
 const IMAGE_PROVIDER_ICONS: Record<ImageProviderId, string> = {
@@ -153,6 +154,7 @@ const IMAGE_PROVIDER_ICONS: Record<ImageProviderId, string> = {
   'nano-banana': '/logos/gemini.svg',
   'minimax-image': '/logos/minimax.svg',
   'grok-image': '/logos/grok.svg',
+  'openrouter-image': '/logos/openrouter.svg',
 };
 
 const VIDEO_PROVIDER_NAMES: Record<VideoProviderId, string> = {
@@ -162,6 +164,7 @@ const VIDEO_PROVIDER_NAMES: Record<VideoProviderId, string> = {
   sora: 'providerSora',
   'minimax-video': 'providerMiniMaxVideo',
   'grok-video': 'providerGrokVideo',
+  'openrouter-video': 'providerOpenRouterVideo',
 };
 
 const VIDEO_PROVIDER_ICONS: Record<VideoProviderId, string> = {
@@ -171,6 +174,7 @@ const VIDEO_PROVIDER_ICONS: Record<VideoProviderId, string> = {
   sora: '/logos/openai.svg',
   'minimax-video': '/logos/minimax.svg',
   'grok-video': '/logos/grok.svg',
+  'openrouter-video': '/logos/openrouter.svg',
 };
 
 interface SettingsDialogProps {
